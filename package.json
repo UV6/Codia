@@ -1,0 +1,36 @@
+{
+  "name": "codia",
+  "version": "0.1.0",
+  "description": "终端 AI 编程助手（类似 Claude Code）",
+  "type": "module",
+  "bin": {
+    "codia": "./bin/codia.tsx"
+  },
+  "scripts": {
+    "dev": "tsx bin/codia.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "coding-assistant"
+  ],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "ink": "^5.2.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.1.0",
+    "yaml": "^2.7.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "@types/react": "^19.1.2",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
