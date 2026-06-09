@@ -49,6 +49,7 @@ export class ChatService {
     let thinkingContent = "";
     let usage: Chunk & { type: "usage" } | null = null;
     let hadError = false;
+    let assistantSaved = false;
 
     try {
       for await (const chunk of this.provider.streamChat(apiMessages, this.config, signal)) {
@@ -77,7 +78,8 @@ export class ChatService {
             break;
 
           case "done":
-            if (!hadError) {
+            if (!hadError && !assistantSaved) {
+              assistantSaved = true;
               // 组装 assistant 消息并写入历史
               const assistantMsg: Message = {
                 role: "assistant",

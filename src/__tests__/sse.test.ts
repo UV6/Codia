@@ -41,9 +41,10 @@ describe("mapToChunk", () => {
       usage: { output_tokens: 50 },
     };
     const result = mapToChunk(data);
-    expect(result.type).toBe("usage");
-    if (result.type === "usage") {
-      expect(result.usage.outputTokens).toBe(50);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe("usage");
+    if (result!.type === "usage") {
+      expect(result!.usage.outputTokens).toBe(50);
     }
   });
 
@@ -62,10 +63,11 @@ describe("mapToChunk", () => {
       usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
     };
     const result = mapToChunk(data);
-    expect(result.type).toBe("usage");
-    if (result.type === "usage") {
-      expect(result.usage.inputTokens).toBe(10);
-      expect(result.usage.outputTokens).toBe(20);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe("usage");
+    if (result!.type === "usage") {
+      expect(result!.usage.inputTokens).toBe(10);
+      expect(result!.usage.outputTokens).toBe(20);
     }
   });
 });

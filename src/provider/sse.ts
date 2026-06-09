@@ -63,6 +63,7 @@ export async function* parseSSEStream(
 }
 
 // parseSSEEvent —— 解析单个 SSE 事件块
+// 返回 null 表示该事件应跳过
 function parseSSEEvent(raw: string): Chunk | null {
   const lines = raw.split("\n");
   let dataContent = "";
@@ -97,7 +98,8 @@ function parseSSEEvent(raw: string): Chunk | null {
 
 // mapToChunk —— 将原始 SSE 数据映射为 Chunk
 // 此函数负责识别 Anthropic 和 OpenAI 的不同事件格式
-export function mapToChunk(data: Record<string, unknown>): Chunk {
+// 返回 null 表示无法识别该事件（调用方应跳过）
+export function mapToChunk(data: Record<string, unknown>): Chunk | null {
   // Anthropic 事件
   if (data.type) {
     const eventType = data.type as string;
@@ -191,6 +193,6 @@ export function mapToChunk(data: Record<string, unknown>): Chunk {
     };
   }
 
-  // 未识别的数据，跳过
-  return { type: "done" };
+  // 未识别的数据，返回 null 让调用方跳过
+  return null;
 }

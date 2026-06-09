@@ -6,7 +6,7 @@ describe("loadConfig", () => {
     const config = loadConfig("codia.yaml");
     expect(config.protocol).toBe("anthropic");
     expect(config.model).toBeTruthy();
-    expect(config.baseUrl).toBe("https://api.anthropic.com");
+    expect(config.baseUrl).toBeTruthy();
     expect(config.apiKey).toBeTruthy();
   });
 

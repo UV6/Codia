@@ -5,7 +5,7 @@ import { InputBox } from "./input-box.js";
 import { ChatView } from "./chat-view.js";
 import { ThinkingBox } from "./thinking-box.js";
 import { StatusBar } from "./status-bar.js";
-import type { Message, Chunk } from "../provider/types.js";
+import type { Message } from "../provider/types.js";
 import type { ChatService } from "../chat/chat-service.js";
 
 interface AppProps {
@@ -48,6 +48,14 @@ export function App({ service }: AppProps) {
     setThinkingCollapsed(false);
     setIsStreaming(true);
 
+    // 立即把用户消息加入视图
+    const userMsg: Message = {
+      role: "user",
+      content: text,
+      timestamp: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
     let fullContent = "";
     let fullThinking = "";
 
@@ -69,7 +77,7 @@ export function App({ service }: AppProps) {
             setError(chunk.error.message);
             break;
           case "done":
-            // 流结束后从 service 取最新消息
+            // 流结束后从 service 同步完整消息历史
             setMessages(service.history);
             setStreamingContent("");
             setStreamingThinking("");
