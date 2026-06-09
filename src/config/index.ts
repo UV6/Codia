@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { parse } from "yaml";
 import type { ChatConfig } from "../provider/types.js";
 
@@ -16,9 +18,12 @@ export class ConfigError extends Error {
 const REQUIRED_FIELDS = ["protocol", "model", "base_url", "api_key"] as const;
 const VALID_PROTOCOLS = ["anthropic", "openai"] as const;
 
+// 默认配置文件路径：~/.Codia/Codia.yml
+export const DEFAULT_CONFIG_PATH = join(homedir(), ".Codia", "Codia.yml");
+
 // loadConfig —— 从 YAML 文件加载并校验配置
-// 默认读取当前工作目录下的 codia.yaml
-export function loadConfig(path: string = "./codia.yaml"): ChatConfig {
+// 默认读取 ~/.Codia/Codia.yml
+export function loadConfig(path: string = DEFAULT_CONFIG_PATH): ChatConfig {
   // 1. 读文件
   let raw: string;
   try {
