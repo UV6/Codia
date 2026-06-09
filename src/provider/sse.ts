@@ -140,6 +140,8 @@ export function mapToChunk(data: Record<string, unknown>): Chunk | null {
           },
         };
       }
+      // message_stop 总是流结束信号
+      return { type: "done" };
     }
 
     if (eventType === "error") {

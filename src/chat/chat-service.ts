@@ -101,9 +101,22 @@ export class ChatService {
         type: "error",
         error: { code: "network", message: (e as Error).message },
       };
-    } finally {
-      this.abortController = null;
     }
+
+    // 流结束后保存 assistant 消息（防重复）
+    if (!hadError && !assistantSaved && fullContent) {
+      const assistantMsg: Message = {
+        role: "assistant",
+        content: fullContent,
+        timestamp: new Date().toISOString(),
+        usage: usage?.usage,
+        ...(thinkingContent ? { thinking: thinkingContent } : {}),
+      };
+      this.messages.push(assistantMsg);
+      appendMessage(this.historyPath, assistantMsg);
+    }
+
+    this.abortController = null;
   }
 
   // cancel —— 中断当前流式请求
