@@ -1,11 +1,64 @@
 #!/usr/bin/env tsx
 
+import { parseArgs } from "node:util";
+import { basename } from "node:path";
 import { render } from "ink";
 import { loadConfig, ConfigError } from "../src/config/index.js";
 import { ChatService } from "../src/chat/chat-service.js";
+import { listSessions, sessionPath, newSessionPath } from "../src/chat/history.js";
 import { App } from "../src/tui/app.js";
 
+const usage = `
+codia — 终端 AI 编程助手
+
+用法: codia [选项]
+
+选项:
+  --session, -s <id>  继续指定的会话
+  --sessions, -ls      列出所有历史会话
+  --help, -h           显示帮助信息
+`.trim();
+
 async function main() {
+  const { values } = parseArgs({
+    args: process.argv.slice(2),
+    options: {
+      session: { type: "string", short: "s" },
+      sessions: { type: "boolean", short: "l" },
+      help: { type: "boolean", short: "h" },
+    },
+    strict: false,
+  });
+
+  // --help
+  if (values.help) {
+    console.log(usage);
+    process.exit(0);
+  }
+
+  // --sessions: 列出历史会话
+  if (values.sessions) {
+    const sessions = listSessions();
+    if (sessions.length === 0) {
+      console.log("暂无历史会话。");
+    } else {
+      console.log("历史会话：\n");
+      for (const s of sessions) {
+        const date = new Date(s.lastMessageTime).toLocaleString("zh-CN");
+        console.log(`  ${s.id}`);
+        console.log(`    消息数: ${s.messageCount}  最后活动: ${date}`);
+        if (s.preview) {
+          console.log(`    预览: ${s.preview}...`);
+        }
+        console.log();
+      }
+      console.log(`共 ${sessions.length} 个会话。`);
+      console.log(`\n继续会话：codia --session <id>`);
+    }
+    process.exit(0);
+  }
+
+  // 加载配置
   let config;
   try {
     config = loadConfig();
@@ -18,9 +71,21 @@ async function main() {
     process.exit(1);
   }
 
-  const service = new ChatService(config);
+  // 确定会话文件
+  const sessionId = typeof values.session === "string" ? values.session : undefined;
+  const filePath = sessionId
+    ? sessionPath(sessionId)
+    : newSessionPath();
 
-  // 确保退出时恢复终端
+  if (sessionId) {
+    console.log(`继续会话：${sessionId}`);
+  } else {
+    const id = basename(filePath, ".jsonl");
+    console.log(`新会话：${id}`);
+  }
+
+  const service = new ChatService(config, filePath);
+
   process.on("exit", () => {
     service.cancel();
   });

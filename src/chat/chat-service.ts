@@ -1,6 +1,6 @@
 import type { Message, ChatConfig, Chunk } from "../provider/types.js";
 import { createProvider } from "../provider/factory.js";
-import { loadHistory, appendMessage } from "./history.js";
+import { loadHistory, appendMessage, newSessionPath } from "./history.js";
 import { buildMessages } from "./context.js";
 
 // ChatService —— 对话核心，串联历史、上下文、Provider
@@ -14,7 +14,7 @@ export class ChatService {
   // onUsage 回调：每次收到 usage chunk 时调用
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null = null;
 
-  constructor(config: ChatConfig, historyPath: string = "./.codia-history.jsonl") {
+  constructor(config: ChatConfig, historyPath: string = newSessionPath()) {
     this.config = config;
     this.historyPath = historyPath;
     this.provider = createProvider(config);
