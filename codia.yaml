@@ -1,0 +1,9 @@
+# Codia LLM 配置
+# protocol: 后端协议，支持 anthropic | openai
+protocol: anthropic
+# model: 模型名称
+model: claude-sonnet-4-6-20250514
+# base_url: API 请求地址
+base_url: https://api.anthropic.com
+# api_key: 你的 API 密钥
+api_key: YOUR_API_KEY_HERE
