@@ -21,6 +21,7 @@ export function App({ service }: AppProps) {
   const [usage, setUsage] = useState<{ inputTokens: number; outputTokens: number; model: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
 
   // 订阅用量回调
   useEffect(() => {
@@ -44,6 +45,7 @@ export function App({ service }: AppProps) {
     setError(null);
     setStreamingContent("");
     setStreamingThinking("");
+    setToolStatus(null);
     setUsage(null);
     setThinkingCollapsed(false);
     setIsStreaming(true);
@@ -73,6 +75,9 @@ export function App({ service }: AppProps) {
           case "usage":
             setUsage(chunk.usage);
             break;
+          case "tool_status":
+            setToolStatus(`🔧 ${chunk.name} ${chunk.param}`);
+            break;
           case "error":
             setError(chunk.error.message);
             break;
@@ -93,7 +98,11 @@ export function App({ service }: AppProps) {
 
   return (
     <Box flexDirection="column" padding={1}>
-      <ChatView messages={messages} streamingContent={streamingContent} />
+      <ChatView
+        messages={messages}
+        streamingContent={streamingContent}
+        toolStatus={toolStatus}
+      />
 
       {streamingThinking && (
         <ThinkingBox thinking={streamingThinking} collapsed={thinkingCollapsed} />

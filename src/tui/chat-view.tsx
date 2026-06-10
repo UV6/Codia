@@ -4,10 +4,11 @@ import type { Message } from "../provider/types.js";
 interface ChatViewProps {
   messages: Message[];
   streamingContent?: string;
+  toolStatus?: string | null;
 }
 
 // ChatView —— 消息列表 + 流式渲染
-export function ChatView({ messages, streamingContent }: ChatViewProps) {
+export function ChatView({ messages, streamingContent, toolStatus }: ChatViewProps) {
   return (
     <Box flexDirection="column">
       {messages.map((msg, i) => {
@@ -61,6 +62,13 @@ export function ChatView({ messages, streamingContent }: ChatViewProps) {
           </Box>
         );
       })}
+
+      {/* 工具调用状态 */}
+      {toolStatus && (
+        <Box marginTop={messages.length > 0 ? 1 : 0}>
+          <Text color="blue">{toolStatus}</Text>
+        </Box>
+      )}
 
       {/* 流式渲染中的内容 */}
       {streamingContent && (
