@@ -1,5 +1,5 @@
-import { resolve } from "node:path";
-import { globSync } from "node:fs";
+import { resolve, join, relative } from "node:path";
+import { globSync, readdirSync, statSync } from "node:fs";
 import type { Tool, ToolContext, ToolResult, ToolInputSchema } from "../types.js";
 
 const MAX_RESULTS = 200;
@@ -58,8 +58,6 @@ export const globTool: Tool = {
 
 // 手动递归 glob（Node.js 22 以下降级方案）
 function manualGlob(dir: string, pattern: string): string[] {
-  const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
-  const path = require("node:path") as typeof import("node:path");
   const results: string[] = [];
 
   function walk(currentDir: string, baseDir: string) {
@@ -72,7 +70,7 @@ function manualGlob(dir: string, pattern: string): string[] {
 
     for (const entry of entries) {
       if (entry === "node_modules" || entry.startsWith(".")) continue;
-      const fullPath = path.join(currentDir, entry);
+      const fullPath = join(currentDir, entry);
       let stat;
       try {
         stat = statSync(fullPath);
@@ -87,7 +85,7 @@ function manualGlob(dir: string, pattern: string): string[] {
         }
       } else if (stat.isFile()) {
         // 简单文件名匹配
-        const relPath = path.relative(baseDir, fullPath);
+        const relPath = relative(baseDir, fullPath);
         if (matchSimple(entry, pattern) || matchSimple(relPath, pattern)) {
           results.push(relPath);
         }

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, openSync, readSync, closeSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Tool, ToolContext, ToolResult, ToolInputSchema } from "../types.js";
 
@@ -14,13 +14,18 @@ const inputSchema: ToolInputSchema = {
 
 // 二进制文件检测：读前 512 字节，有 null byte 则为二进制
 function isBinary(filePath: string): boolean {
-  const fd = require("node:fs").openSync(filePath, "r");
   try {
-    const buf = Buffer.alloc(512);
-    const bytesRead = require("node:fs").readSync(fd, buf, 0, 512, 0);
-    return buf.slice(0, bytesRead).includes(0);
-  } finally {
-    require("node:fs").closeSync(fd);
+    const fd = openSync(filePath, "r");
+    try {
+      const buf = Buffer.alloc(512);
+      const bytesRead = readSync(fd, buf, 0, 512, 0);
+      return buf.slice(0, bytesRead).includes(0);
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    // 读不了就当文本处理
+    return false;
   }
 }
 
