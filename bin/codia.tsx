@@ -3,7 +3,7 @@
 import { parseArgs } from "node:util";
 import { basename } from "node:path";
 import { render } from "ink";
-import { loadConfig, ConfigError } from "../src/config/index.js";
+import { loadAppConfig, ConfigError } from "../src/config/index.js";
 import { ChatService } from "../src/chat/chat-service.js";
 import { listSessions, sessionPath, newSessionPath } from "../src/chat/history.js";
 import { App } from "../src/tui/app.js";
@@ -59,9 +59,9 @@ async function main() {
   }
 
   // 加载配置
-  let config;
+  let appConfig;
   try {
-    config = loadConfig();
+    appConfig = loadAppConfig();
   } catch (e) {
     if (e instanceof ConfigError) {
       console.error(`配置错误 [${e.code}]：${e.message}`);
@@ -84,7 +84,7 @@ async function main() {
     console.log(`新会话：${id}`);
   }
 
-  const service = new ChatService(config, filePath);
+  const service = new ChatService(appConfig, filePath, appConfig.agentLoop.maxRounds);
 
   process.on("exit", () => {
     service.cancel();

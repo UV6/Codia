@@ -35,4 +35,23 @@ export class ToolRegistry {
   getAll(): Tool[] {
     return Array.from(this.tools.values());
   }
+
+  // 获取所有只读工具
+  getReadOnlyTools(): Tool[] {
+    return Array.from(this.tools.values()).filter((t) => t.readOnly);
+  }
+
+  // 获取内部工具 Map 的只读引用（供 ToolScheduler 查询 destructive 标签等）
+  getToolMap(): ReadonlyMap<string, Tool> {
+    return this.tools;
+  }
+
+  // 从指定 Tool 数组生成 ToolMeta 数组（供 plan mode 使用）
+  getMetasByTools(tools: Tool[]): ToolMeta[] {
+    return tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.inputSchema,
+    }));
+  }
 }

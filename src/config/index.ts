@@ -15,6 +15,16 @@ export class ConfigError extends Error {
   }
 }
 
+// AgentLoopConfig —— agent_loop 配置段
+export interface AgentLoopYamlConfig {
+  maxRounds?: number; // 默认 20
+}
+
+// AppConfig —— 完整应用配置
+export interface AppConfig extends ChatConfig {
+  agentLoop: AgentLoopYamlConfig;
+}
+
 const REQUIRED_FIELDS = ["protocol", "model", "base_url", "api_key"] as const;
 const VALID_PROTOCOLS = ["anthropic", "openai"] as const;
 
@@ -65,5 +75,28 @@ export function loadConfig(path: string = DEFAULT_CONFIG_PATH): ChatConfig {
     model: parsed.model as string,
     baseUrl: (parsed.base_url as string).replace(/\/+$/, ""), // 去掉末尾斜杠
     apiKey: parsed.api_key as string,
+  };
+}
+
+// loadAppConfig —— 加载包含 agent_loop 的完整配置
+export function loadAppConfig(path: string = DEFAULT_CONFIG_PATH): AppConfig {
+  const chatConfig = loadConfig(path);
+
+  // 解析 agent_loop 部分
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf-8");
+  } catch {
+    return { ...chatConfig, agentLoop: {} };
+  }
+
+  const parsed = parse(raw) as Record<string, unknown>;
+  const agentLoop = (parsed.agent_loop as Record<string, unknown>) ?? {};
+
+  return {
+    ...chatConfig,
+    agentLoop: {
+      maxRounds: typeof agentLoop.max_rounds === "number" ? agentLoop.max_rounds : undefined,
+    },
   };
 }
