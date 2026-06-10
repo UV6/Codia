@@ -104,6 +104,18 @@ export function mapToChunk(data: Record<string, unknown>): Chunk | null {
   if (data.type) {
     const eventType = data.type as string;
 
+    // content_block_start: 新 block 开始（可能是 tool_use）
+    if (eventType === "content_block_start") {
+      const block = data.content_block as Record<string, unknown>;
+      if (block?.type === "tool_use") {
+        return {
+          type: "tool_use_start",
+          id: block.id as string,
+          name: block.name as string,
+        };
+      }
+    }
+
     if (eventType === "content_block_delta") {
       const delta = data.delta as Record<string, unknown>;
       if (delta.type === "text_delta") {
@@ -111,6 +123,9 @@ export function mapToChunk(data: Record<string, unknown>): Chunk | null {
       }
       if (delta.type === "thinking_delta") {
         return { type: "thinking", content: delta.thinking as string };
+      }
+      if (delta.type === "input_json_delta") {
+        return { type: "tool_input_delta", partialJson: delta.partial_json as string };
       }
     }
 

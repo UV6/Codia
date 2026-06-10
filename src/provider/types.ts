@@ -1,3 +1,5 @@
+import type { ToolCall, ToolResult } from "../tool/types.js";
+
 // ChatConfig —— YAML 配置文件中的 LLM 供应商信息
 export interface ChatConfig {
   protocol: "anthropic" | "openai";
@@ -17,6 +19,9 @@ export interface Message {
     model: string;
   };
   thinking?: string; // Claude extended thinking 内容
+  toolCalls?: ToolCall[]; // assistant 消息可能含工具调用
+  toolResult?: ToolResult; // user-like 消息含工具执行结果
+  toolUseId?: string; // 关联 tool_result 和 tool_use
 }
 
 // Chunk —— Provider 流式输出的最小单元
@@ -25,7 +30,11 @@ export type Chunk =
   | { type: "thinking"; content: string }
   | { type: "usage"; usage: { inputTokens: number; outputTokens: number; model: string } }
   | { type: "error"; error: { code: "auth" | "rate_limit" | "network" | "unknown"; message: string } }
-  | { type: "done" };
+  | { type: "done" }
+  | { type: "tool_use"; call: ToolCall }
+  | { type: "tool_status"; name: string; param: string }
+  | { type: "tool_use_start"; id: string; name: string }
+  | { type: "tool_input_delta"; partialJson: string };
 
 // LLMProvider —— 统一的后端抽象接口
 export interface LLMProvider {
@@ -34,5 +43,6 @@ export interface LLMProvider {
     messages: Message[],
     config: ChatConfig,
     signal: AbortSignal,
+    tools?: Record<string, unknown>[],
   ): AsyncIterable<Chunk>;
 }

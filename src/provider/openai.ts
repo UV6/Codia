@@ -10,6 +10,7 @@ export class OpenAIProvider implements LLMProvider {
     messages: Message[],
     config: ChatConfig,
     signal: AbortSignal,
+    tools?: Record<string, unknown>[],
   ): AsyncIterable<Chunk> {
     const body = this.buildRequestBody(messages, config);
     const url = `${config.baseUrl}/v1/chat/completions`;
