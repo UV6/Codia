@@ -1,21 +1,24 @@
-import type { Message, ChatConfig, Chunk } from "../provider/types.js";
-import type { ToolCall } from "../tool/types.js";
+import type { Message, ChatConfig } from "../provider/types.js";
 import { createProvider } from "../provider/factory.js";
 import { loadHistory, appendMessage, newSessionPath } from "./history.js";
-import { buildMessages } from "./context.js";
 import { ToolRegistry } from "../tool/registry.js";
-import { executeTool } from "../tool/executor.js";
 import { readFileTool } from "../tool/tools/read-file.js";
 import { writeFileTool } from "../tool/tools/write-file.js";
 import { editFileTool } from "../tool/tools/edit-file.js";
 import { globTool } from "../tool/tools/glob.js";
 import { grepTool } from "../tool/tools/grep.js";
 import { runCommandTool } from "../tool/tools/run-command.js";
+import { AgentLoop, DEFAULT_MAX_ROUNDS } from "../agent/loop.js";
+import {
+  isPlanCommand,
+  isDoCommand,
+  extractPlanMessage,
+  PLAN_MODE_PROMPT,
+} from "../agent/plan-mode.js";
+import type { AgentEvent, AgentLoopConfig } from "../agent/types.js";
 
-// 最多一次工具调用循环
-const MAX_TOOL_ROUNDS = 1;
-
-// ChatService —— 对话核心，串联历史、上下文、Provider、工具
+// ChatService —— 对话核心
+// 负责消息历史管理、会话持久化、命令解析，循环逻辑委托给 AgentLoop
 export class ChatService {
   private provider;
   private config: ChatConfig;
@@ -23,15 +26,19 @@ export class ChatService {
   private messages: Message[] = [];
   private abortController: AbortController | null = null;
   private registry: ToolRegistry;
+  private agentLoop: AgentLoop;
+  private mode: "full" | "plan" = "full";
+  private maxRounds: number;
 
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
 
-  constructor(config: ChatConfig, historyPath: string = newSessionPath()) {
+  constructor(config: ChatConfig, historyPath: string = newSessionPath(), maxRounds?: number) {
     this.config = config;
     this.historyPath = historyPath;
     this.provider = createProvider(config);
     this.messages = loadHistory(historyPath);
+    this.maxRounds = maxRounds ?? DEFAULT_MAX_ROUNDS;
 
     // 注册六个核心工具
     this.registry = new ToolRegistry();
@@ -41,23 +48,42 @@ export class ChatService {
     this.registry.register(globTool);
     this.registry.register(grepTool);
     this.registry.register(runCommandTool);
+
+    this.agentLoop = new AgentLoop(this.registry);
   }
 
   get history(): Message[] {
     return [...this.messages];
   }
 
-  // getToolMetas —— 生成 API 格式的工具列表
-  getToolMetas(): Record<string, unknown>[] {
-    return this.registry.getAllMetas() as unknown as Record<string, unknown>[];
+  // 当前模式
+  get currentMode(): "full" | "plan" {
+    return this.mode;
   }
 
-  async *sendMessage(text: string): AsyncIterable<Chunk> {
+  async *sendMessage(text: string): AsyncIterable<AgentEvent> {
     this.cancel();
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
 
-    const tools = this.getToolMetas();
+    // 解析命令
+    if (isPlanCommand(text)) {
+      this.mode = "plan";
+      const planMessage = extractPlanMessage(text) || "请分析需求并写入执行计划";
+      text = planMessage;
+
+      // 注入 plan mode system prompt
+      this.ensurePlanModePrompt();
+    } else if (isDoCommand(text)) {
+      if (this.mode === "plan") {
+        this.mode = "full";
+        // 移除 plan mode system prompt
+        this.removePlanModePrompt();
+        return; // /do 本身不产生对话
+      }
+      // 非 plan 模式下 /do 无操作
+      return;
+    }
 
     // 用户消息
     const userMsg: Message = {
@@ -68,161 +94,36 @@ export class ChatService {
     this.messages.push(userMsg);
     appendMessage(this.historyPath, userMsg);
 
-    let toolRound = 0;
+    // 记录循环前的消息数量，用于后续持久化
+    const prevCount = this.messages.length;
 
-    while (toolRound <= MAX_TOOL_ROUNDS) {
-      // 构建 API 消息列表
-      const apiMessages =
-        toolRound === 0
-          ? buildMessages(
-              this.messages.slice(0, -1), // 除去刚加的 userMsg
-              text,
-            )
-          : [
-              ...this.messages.filter((m) => m.role !== "system"), // 系统消息不重复
-            ];
+    // 构建 AgentLoop 配置
+    const agentConfig: AgentLoopConfig = {
+      maxRounds: this.maxRounds,
+      mode: this.mode,
+    };
 
-      // 加回 system
-      const systemMsg = this.messages.find((m) => m.role === "system");
-      if (!systemMsg && toolRound > 0) {
-        // 手动构造 system
-        apiMessages.unshift({
-          role: "system",
-          content: "You are Codia, a helpful CLI AI assistant.",
-          timestamp: new Date().toISOString(),
-        });
+    // 启动 AgentLoop
+    for await (const event of this.agentLoop.run(
+      this.messages,
+      this.provider,
+      this.config,
+      agentConfig,
+      signal,
+    )) {
+      // 转发事件给界面
+      yield event;
+
+      // Token 用量回调
+      if (event.type === "usage" && this.onUsage) {
+        this.onUsage(event.usage);
       }
+    }
 
-      let fullContent = "";
-      let thinkingContent = "";
-      let usage: Chunk & { type: "usage" } | null = null;
-      let hadError = false;
-      let toolCalls: ToolCall[] = [];
-      let assistantSaved = false;
-
-      try {
-        const stream =
-          toolRound === 0 || tools.length > 0
-            ? this.provider.streamChat(apiMessages, this.config, signal, tools)
-            : this.provider.streamChat(apiMessages, this.config, signal);
-
-        for await (const chunk of stream) {
-          switch (chunk.type) {
-            case "text":
-              fullContent += chunk.content;
-              yield chunk;
-              break;
-
-            case "thinking":
-              thinkingContent += chunk.content;
-              yield chunk;
-              break;
-
-            case "tool_use":
-              toolCalls.push(chunk.call);
-              yield {
-                type: "tool_status",
-                name: chunk.call.name,
-                param: JSON.stringify(chunk.call.input).slice(0, 80),
-              };
-              yield chunk;
-              break;
-
-            case "tool_status":
-              yield chunk;
-              break;
-
-            case "usage":
-              usage = chunk;
-              if (this.onUsage) this.onUsage(chunk.usage);
-              yield chunk;
-              break;
-
-            case "error":
-              hadError = true;
-              yield chunk;
-              break;
-
-            case "done":
-              if (!hadError && !assistantSaved && fullContent && toolCalls.length === 0) {
-                assistantSaved = true;
-                const assistantMsg: Message = {
-                  role: "assistant",
-                  content: fullContent,
-                  timestamp: new Date().toISOString(),
-                  usage: usage?.usage,
-                  ...(thinkingContent ? { thinking: thinkingContent } : {}),
-                };
-                this.messages.push(assistantMsg);
-                appendMessage(this.historyPath, assistantMsg);
-              }
-              yield chunk;
-              break;
-          }
-        }
-      } catch (e) {
-        yield {
-          type: "error",
-          error: { code: "network", message: (e as Error).message },
-        };
-        break;
-      }
-
-      // 没有工具调用 → 结束
-      if (toolCalls.length === 0) {
-        // 兜底保存（如果上面的 done 没触发）
-        if (!hadError && !assistantSaved && fullContent) {
-          const assistantMsg: Message = {
-            role: "assistant",
-            content: fullContent,
-            timestamp: new Date().toISOString(),
-            usage: usage?.usage,
-            ...(thinkingContent ? { thinking: thinkingContent } : {}),
-          };
-          this.messages.push(assistantMsg);
-          appendMessage(this.historyPath, assistantMsg);
-        }
-        break;
-      }
-
-      // 有工具调用 → 保存 assistant(tool_use) 消息
-      const toolAssistantMsg: Message = {
-        role: "assistant",
-        content: fullContent,
-        timestamp: new Date().toISOString(),
-        toolCalls,
-        usage: usage?.usage,
-      };
-      this.messages.push(toolAssistantMsg);
-      appendMessage(this.historyPath, toolAssistantMsg);
-
-      // 执行工具（只取第一个 tool_use）
-      const firstCall = toolCalls[0];
-      const context = { cwd: process.cwd(), signal };
-      const { result } = await executeTool(firstCall, context, this.registry);
-
-      // 展示工具结果状态
-      yield {
-        type: "tool_status",
-        name: firstCall.name,
-        param: result.status === "success" ? "完成" : "失败",
-      };
-
-      // 工具结果作为 user 消息加入历史
-      const toolResultMsg: Message = {
-        role: "user",
-        content: result.content,
-        timestamp: new Date().toISOString(),
-        toolResult: result,
-        toolUseId: firstCall.id,
-      };
-      this.messages.push(toolResultMsg);
-      appendMessage(this.historyPath, toolResultMsg);
-
-      toolRound++;
-
-      // 达到最大轮数 → 收到工具结果后模型给最终回复
-      // 重置，进入下一轮 while（最多再一轮）
+    // 持久化本轮新增的消息
+    const newMessages = this.messages.slice(prevCount);
+    for (const msg of newMessages) {
+      appendMessage(this.historyPath, msg);
     }
 
     this.abortController = null;
@@ -232,6 +133,38 @@ export class ChatService {
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
+    }
+  }
+
+  // ensurePlanModePrompt —— 确保 messages 中包含 plan mode prompt
+  private ensurePlanModePrompt(): void {
+    // plan file 路径暂用默认值
+    const fullPrompt = PLAN_MODE_PROMPT + "plan.md";
+    const existingSys = this.messages.find((m) => m.role === "system");
+    if (existingSys) {
+      // 追加到已有 system 消息
+      if (!existingSys.content.includes("Plan Mode")) {
+        existingSys.content += "\n\n" + fullPrompt;
+      }
+    } else {
+      // 创建新的 system 消息
+      this.messages.unshift({
+        role: "system",
+        content: "You are Codia, a helpful CLI AI assistant.\n\n" + fullPrompt,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  // removePlanModePrompt —— 移除 plan mode prompt
+  private removePlanModePrompt(): void {
+    const sysMsg = this.messages.find((m) => m.role === "system");
+    if (sysMsg) {
+      // 移除 PLAN_MODE_PROMPT 部分
+      const idx = sysMsg.content.indexOf(PLAN_MODE_PROMPT);
+      if (idx !== -1) {
+        sysMsg.content = sysMsg.content.slice(0, idx).trimEnd();
+      }
     }
   }
 }
