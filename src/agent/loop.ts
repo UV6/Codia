@@ -164,27 +164,28 @@ export class AgentLoop {
   }
 
   // buildRoundMessages —— 构建当轮的临时消息列表，注入 reminders
-  // reminders 插入到最后一个 user 消息之前，不污染原始 messages 数组
+  // reminders 插入到最后一个非 tool_result 的 user 消息之前（即真正的用户输入），
+  // 跳过 tool_result 消息以保持与 assistant(tool_use) 的配对关系
   private buildRoundMessages(messages: Message[], reminders: SystemReminder[]): Message[] {
     if (reminders.length === 0) return messages;
 
     const reminderMsgs = reminders.map((r) => reminderToMessage(r));
     const roundMessages = [...messages];
 
-    // 找到最后一个 user role 消息的位置
-    let lastUserIdx = -1;
+    // 找到最后一个非 tool_result 的 user 消息（真正的用户输入）
+    let lastUserQueryIdx = -1;
     for (let i = roundMessages.length - 1; i >= 0; i--) {
-      if (roundMessages[i].role === "user") {
-        lastUserIdx = i;
+      if (roundMessages[i].role === "user" && !roundMessages[i].toolResult) {
+        lastUserQueryIdx = i;
         break;
       }
     }
 
-    if (lastUserIdx >= 0) {
-      // 在最后一个 user 消息之前插入 reminders
-      roundMessages.splice(lastUserIdx, 0, ...reminderMsgs);
+    if (lastUserQueryIdx >= 0) {
+      // 在真正的用户输入之前插入 reminders
+      roundMessages.splice(lastUserQueryIdx, 0, ...reminderMsgs);
     } else {
-      // 没有 user 消息，追加到末尾
+      // 没有符合条件的 user 消息，追加到末尾
       roundMessages.push(...reminderMsgs);
     }
 
