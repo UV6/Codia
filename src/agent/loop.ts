@@ -1,11 +1,9 @@
-import type { Message, ChatConfig, LLMProvider, Chunk } from "../provider/types.js";
-import type { Tool, ToolContext } from "../tool/types.js";
+import type { Message, ChatConfig, LLMProvider } from "../provider/types.js";
+import type { ToolContext } from "../tool/types.js";
 import type { ToolRegistry } from "../tool/registry.js";
 import { StreamCollector } from "./stream-collector.js";
 import { ToolScheduler } from "./tool-scheduler.js";
 import { filterReadOnlyTools } from "./plan-mode.js";
-import { reminderToMessage } from "../prompt/reminders.js";
-import type { ReminderProvider, SystemReminder } from "../prompt/types.js";
 import type {
   AgentEvent,
   AgentLoopConfig,
@@ -33,7 +31,6 @@ export class AgentLoop {
     signal: AbortSignal,
     cwd: string = process.cwd(),
     systemPrompt?: string,
-    getReminders?: ReminderProvider,
   ): AsyncIterable<AgentEvent> {
     const maxRounds = config.maxRounds || DEFAULT_MAX_ROUNDS;
     const allTools = this.registry.getAll();
@@ -50,13 +47,9 @@ export class AgentLoop {
           ? filterReadOnlyTools(allTools)
           : allToolMetas;
 
-      // 2. 获取本轮 reminders，构建临时消息列表（reminders 不持久化到 messages）
-      const reminders = getReminders?.(round) ?? [];
-      const roundMessages = this.buildRoundMessages(messages, reminders);
-
-      // 3. 调用 LLM 流
+      // 2. 调用 LLM 流（messages 已由 ChatService 组装好，含 reminders）
       const stream = provider.streamChat(
-        roundMessages,
+        messages,
         chatConfig,
         signal,
         toolMetas as unknown as Record<string, unknown>[],
@@ -161,34 +154,5 @@ export class AgentLoop {
     if (round >= maxRounds) {
       yield { type: "stopped", reason: "max_rounds" };
     }
-  }
-
-  // buildRoundMessages —— 构建当轮的临时消息列表，注入 reminders
-  // reminders 插入到最后一个非 tool_result 的 user 消息之前（即真正的用户输入），
-  // 跳过 tool_result 消息以保持与 assistant(tool_use) 的配对关系
-  private buildRoundMessages(messages: Message[], reminders: SystemReminder[]): Message[] {
-    if (reminders.length === 0) return messages;
-
-    const reminderMsgs = reminders.map((r) => reminderToMessage(r));
-    const roundMessages = [...messages];
-
-    // 找到最后一个非 tool_result 的 user 消息（真正的用户输入）
-    let lastUserQueryIdx = -1;
-    for (let i = roundMessages.length - 1; i >= 0; i--) {
-      if (roundMessages[i].role === "user" && !roundMessages[i].toolResult) {
-        lastUserQueryIdx = i;
-        break;
-      }
-    }
-
-    if (lastUserQueryIdx >= 0) {
-      // 在真正的用户输入之前插入 reminders
-      roundMessages.splice(lastUserQueryIdx, 0, ...reminderMsgs);
-    } else {
-      // 没有符合条件的 user 消息，追加到末尾
-      roundMessages.push(...reminderMsgs);
-    }
-
-    return roundMessages;
   }
 }
