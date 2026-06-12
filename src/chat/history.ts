@@ -100,7 +100,7 @@ export function loadHistory(filePath: string): Message[] {
   for (const line of lines) {
     try {
       const msg = JSON.parse(line) as Message;
-      if (msg.role && msg.content) {
+      if (msg.role && (msg.content || msg.toolCalls || msg.toolResult)) {
         messages.push(msg);
       }
     } catch {
