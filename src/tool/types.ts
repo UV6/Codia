@@ -23,6 +23,7 @@ export interface ToolContext {
 export interface ToolResult {
   status: "success" | "error";
   content: string;
+  permissionDenied?: boolean; // 权限系统拒绝时标记为 true
   metadata?: {
     bytesWritten?: number;
     lineCount?: number;

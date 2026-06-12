@@ -4,6 +4,7 @@ import type { ToolRegistry } from "../tool/registry.js";
 import { StreamCollector } from "./stream-collector.js";
 import { ToolScheduler } from "./tool-scheduler.js";
 import { filterReadOnlyTools } from "./plan-mode.js";
+import type { PermissionChecker } from "../permission/checker.js";
 import type {
   AgentEvent,
   AgentLoopConfig,
@@ -31,6 +32,7 @@ export class AgentLoop {
     signal: AbortSignal,
     cwd: string = process.cwd(),
     systemPrompt?: string,
+    permissionChecker?: PermissionChecker,
   ): AsyncIterable<AgentEvent> {
     const maxRounds = config.maxRounds || DEFAULT_MAX_ROUNDS;
     const allTools = this.registry.getAll();
@@ -108,7 +110,11 @@ export class AgentLoop {
 
       let toolResults: ScheduleResult[];
       try {
-        toolResults = await scheduler.schedule(result.toolCalls, context);
+        toolResults = await scheduler.schedule(
+          result.toolCalls,
+          context,
+          permissionChecker,
+        );
       } catch (e) {
         // 调度器自身异常（不应发生，但兜底）
         yield { type: "stopped", reason: "stream_error" };

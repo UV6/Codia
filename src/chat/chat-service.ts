@@ -27,6 +27,11 @@ import {
   outputSection,
 } from "../prompt/sections.js";
 import { execSync } from "node:child_process";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import type { PermissionMode, HumanInTheLoopCallback } from "../permission/types.js";
+import { RuleEngine } from "../permission/rule-engine.js";
+import { PermissionChecker } from "../permission/checker.js";
 
 // ChatService —— 对话核心
 // 负责消息历史管理、会话持久化、命令解析，循环逻辑委托给 AgentLoop
@@ -44,15 +49,27 @@ export class ChatService {
   // 提示词管线：基础模块 + 环境信息合并为完整 system prompt
   private fullSystemPrompt: string;
 
+  // 权限系统配置
+  private permissionMode: PermissionMode;
+  private humanInTheLoop?: HumanInTheLoopCallback;
+
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
 
-  constructor(config: ChatConfig, historyPath: string = newSessionPath(), maxRounds?: number) {
+  constructor(
+    config: ChatConfig,
+    historyPath: string = newSessionPath(),
+    maxRounds?: number,
+    permissionMode: PermissionMode = "default",
+    humanInTheLoop?: HumanInTheLoopCallback,
+  ) {
     this.config = config;
     this.historyPath = historyPath;
     this.provider = createProvider(config);
     this.messages = loadHistory(historyPath);
     this.maxRounds = maxRounds ?? DEFAULT_MAX_ROUNDS;
+    this.permissionMode = permissionMode;
+    this.humanInTheLoop = humanInTheLoop;
 
     // 注册六个核心工具
     this.registry = new ToolRegistry();
@@ -122,7 +139,21 @@ export class ChatService {
     const agentConfig: AgentLoopConfig = {
       maxRounds: this.maxRounds,
       mode: this.mode,
+      permissionMode: this.permissionMode,
+      humanInTheLoop: this.humanInTheLoop,
     };
+
+    // 构建 PermissionChecker（如有 humanInTheLoop 回调或使用默认）
+    const cwd = process.cwd();
+    const globalRulesPath = join(homedir(), ".codia", "permissions.yaml");
+    const projectRulesPath = join(cwd, ".codia", "permissions.yaml");
+    const localRulesPath = join(cwd, ".codia", "permissions.local.yaml");
+
+    const ruleEngine = new RuleEngine(globalRulesPath, projectRulesPath, localRulesPath);
+    await ruleEngine.load();
+
+    const humanCallback = this.humanInTheLoop ?? createDefaultHumanCallback();
+    const permissionChecker = new PermissionChecker(ruleEngine, this.permissionMode, humanCallback);
 
     // 本轮 system prompt（完整 prompt + 可选的 plan mode 后缀）
     const systemPrompt = this.mode === "plan"
@@ -136,8 +167,9 @@ export class ChatService {
       this.config,
       agentConfig,
       signal,
-      process.cwd(),
+      cwd,
       systemPrompt,
+      permissionChecker,
     )) {
       yield event;
 
@@ -186,4 +218,27 @@ export class ChatService {
 
     return info.join("\n");
   }
+}
+
+// createDefaultHumanCallback —— 当 TUI 未注入回调时使用的简单 console 回退
+// 通过 stdin/stdout 进行交互（非 TUI 模式下的兜底）
+function createDefaultHumanCallback(): HumanInTheLoopCallback {
+  return async (prompt) => {
+    const msg = `\n[权限确认] ${prompt.toolCall}\n原因: ${prompt.reason}\n请输入 y(是) / n(否) / a(始终允许): `;
+    return new Promise((resolve) => {
+      const { stdin, stdout } = process;
+      stdout.write(msg);
+      stdin.resume();
+      stdin.setEncoding("utf-8");
+      const onData = (data: string) => {
+        const input = data.trim().toLowerCase();
+        stdin.removeListener("data", onData);
+        stdin.pause();
+        if (input === "a") resolve("always_allow");
+        else if (input === "n") resolve("no");
+        else resolve("yes"); // 默认当作 yes
+      };
+      stdin.on("data", onData);
+    });
+  };
 }

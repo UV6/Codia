@@ -7,6 +7,14 @@ import { loadAppConfig, ConfigError } from "../src/config/index.js";
 import { ChatService } from "../src/chat/chat-service.js";
 import { listSessions, sessionPath, newSessionPath } from "../src/chat/history.js";
 import { App } from "../src/tui/app.js";
+import type { PermissionMode } from "../src/permission/types.js";
+
+const VALID_PERMISSION_MODES: PermissionMode[] = [
+  "default",
+  "acceptsEdit",
+  "plan",
+  "bypassPermissions",
+];
 
 const usage = `
 codia — 终端 AI 编程助手
@@ -14,9 +22,10 @@ codia — 终端 AI 编程助手
 用法: codia [选项]
 
 选项:
-  --session, -s <id>  继续指定的会话
-  --sessions, -ls      列出所有历史会话
-  --help, -h           显示帮助信息
+  --session, -s <id>       继续指定的会话
+  --sessions, -ls           列出所有历史会话
+  --permission-mode <mode>  权限模式：default / acceptsEdit / plan / bypassPermissions（默认 default）
+  --help, -h                显示帮助信息
 `.trim();
 
 async function main() {
@@ -25,6 +34,7 @@ async function main() {
     options: {
       session: { type: "string", short: "s" },
       sessions: { type: "boolean", short: "l" },
+      "permission-mode": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
     strict: false,
@@ -58,6 +68,20 @@ async function main() {
     process.exit(0);
   }
 
+  // 解析权限模式
+  let permissionMode: PermissionMode = "default";
+  if (typeof values["permission-mode"] === "string") {
+    const input = values["permission-mode"] as string;
+    if ((VALID_PERMISSION_MODES as string[]).includes(input)) {
+      permissionMode = input as PermissionMode;
+    } else {
+      console.error(
+        `无效的权限模式：${input}。支持：${VALID_PERMISSION_MODES.join(", ")}`,
+      );
+      process.exit(1);
+    }
+  }
+
   // 加载配置
   let appConfig;
   try {
@@ -84,7 +108,12 @@ async function main() {
     console.log(`新会话：${id}`);
   }
 
-  const service = new ChatService(appConfig, filePath, appConfig.agentLoop.maxRounds);
+  const service = new ChatService(
+    appConfig,
+    filePath,
+    appConfig.agentLoop.maxRounds,
+    permissionMode,
+  );
 
   process.on("exit", () => {
     service.cancel();
