@@ -26,12 +26,7 @@ import {
   toneSection,
   outputSection,
 } from "../prompt/sections.js";
-import { wrapReminder } from "../prompt/reminders.js";
-import type { SystemReminder } from "../prompt/types.js";
 import { execSync } from "node:child_process";
-
-// PLAN_MODE_TAG —— plan mode 活跃时的简短标签
-const PLAN_MODE_TAG = "Plan Mode 已激活，plan file: plan.md";
 
 // ChatService —— 对话核心
 // 负责消息历史管理、会话持久化、命令解析，循环逻辑委托给 AgentLoop
@@ -46,9 +41,8 @@ export class ChatService {
   private mode: "full" | "plan" = "full";
   private maxRounds: number;
 
-  // 提示词管线
-  private baseSystemPrompt: string;
-  private envReminderInjected: boolean = false;
+  // 提示词管线：基础模块 + 环境信息合并为完整 system prompt
+  private fullSystemPrompt: string;
 
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
@@ -71,7 +65,7 @@ export class ChatService {
 
     this.agentLoop = new AgentLoop(this.registry);
 
-    // 构建稳定的基础 System Prompt（七个固定模块，缓存友好）
+    // 构建完整 System Prompt：七个固定模块 + 环境信息
     const builder = new SystemPromptBuilder();
     builder.add(identitySection());
     builder.add(constraintsSection());
@@ -80,7 +74,9 @@ export class ChatService {
     builder.add(toolUseSection());
     builder.add(toneSection());
     builder.add(outputSection());
-    this.baseSystemPrompt = builder.build();
+    const basePrompt = builder.build();
+    const envInfo = this.buildEnvInfo();
+    this.fullSystemPrompt = envInfo ? `${basePrompt}\n\n${envInfo}` : basePrompt;
   }
 
   get history(): Message[] {
@@ -105,26 +101,15 @@ export class ChatService {
     } else if (isDoCommand(text)) {
       if (this.mode === "plan") {
         this.mode = "full";
-        return; // /do 本身不产生对话
+        return;
       }
       return;
     }
 
-    // 注入环境信息 reminder（仅首条消息前注入一次）
-    // 通过前缀形式合并到用户消息中，避免产生连续 user 消息违反 API 交替规则
-    let envReminderPrefix = "";
-    if (!this.envReminderInjected) {
-      this.envReminderInjected = true;
-      const envReminder = this.buildEnvReminder();
-      if (envReminder) {
-        envReminderPrefix = wrapReminder(envReminder) + "\n\n";
-      }
-    }
-
-    // 用户消息（reminder + 用户输入合并为一条消息）
+    // 用户消息（干净，不含环境信息）
     const userMsg: Message = {
       role: "user",
-      content: envReminderPrefix + text,
+      content: text,
       timestamp: new Date().toISOString(),
     };
     this.messages.push(userMsg);
@@ -139,10 +124,10 @@ export class ChatService {
       mode: this.mode,
     };
 
-    // 构建本轮 system prompt（基础模块 + 可选的 plan mode 后缀）
+    // 本轮 system prompt（完整 prompt + 可选的 plan mode 后缀）
     const systemPrompt = this.mode === "plan"
-      ? this.baseSystemPrompt + "\n\n" + PLAN_MODE_PROMPT + "plan.md"
-      : this.baseSystemPrompt;
+      ? this.fullSystemPrompt + "\n\n" + PLAN_MODE_PROMPT + "plan.md"
+      : this.fullSystemPrompt;
 
     // 启动 AgentLoop
     for await (const event of this.agentLoop.run(
@@ -154,10 +139,8 @@ export class ChatService {
       process.cwd(),
       systemPrompt,
     )) {
-      // 转发事件给界面
       yield event;
 
-      // Token 用量回调
       if (event.type === "usage" && this.onUsage) {
         this.onUsage(event.usage);
       }
@@ -179,8 +162,8 @@ export class ChatService {
     }
   }
 
-  // buildEnvReminder —— 收集系统环境和 Git 上下文
-  private buildEnvReminder(): SystemReminder | null {
+  // buildEnvInfo —— 收集系统环境和 Git 上下文，返回纯文本
+  private buildEnvInfo(): string {
     const info: string[] = [];
     info.push(`操作系统: ${process.platform}`);
     info.push(`Shell: ${process.env.SHELL || "unknown"}`);
@@ -218,10 +201,6 @@ export class ChatService {
       // 非 git 仓库或 git 不可用，跳过
     }
 
-    return {
-      source: "env-info",
-      content: info.join("\n"),
-      round: 0,
-    };
+    return info.join("\n");
   }
 }
