@@ -162,7 +162,8 @@ export class ChatService {
     }
   }
 
-  // buildEnvInfo —— 收集系统环境和 Git 上下文，返回纯文本
+  // buildEnvInfo —— 收集系统环境，返回纯文本
+  // 注意：不包含 git status/log，避免模型误读文件列表当答案
   private buildEnvInfo(): string {
     const info: string[] = [];
     info.push(`操作系统: ${process.platform}`);
@@ -178,24 +179,6 @@ export class ChatService {
       }).trim();
       if (gitBranch) {
         info.push(`Git 分支: ${gitBranch}`);
-      }
-
-      const gitLog = execSync("git log --oneline -3", {
-        cwd: process.cwd(),
-        encoding: "utf-8",
-        timeout: 3000,
-      }).trim();
-      if (gitLog) {
-        info.push(`最近提交:\n${gitLog}`);
-      }
-
-      const gitStatus = execSync("git status --short", {
-        cwd: process.cwd(),
-        encoding: "utf-8",
-        timeout: 3000,
-      }).trim();
-      if (gitStatus) {
-        info.push(`未提交变更:\n${gitStatus}`);
       }
     } catch {
       // 非 git 仓库或 git 不可用，跳过
