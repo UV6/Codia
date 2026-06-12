@@ -111,24 +111,20 @@ export class ChatService {
     }
 
     // 注入环境信息 reminder（仅首条消息前注入一次）
+    // 通过前缀形式合并到用户消息中，避免产生连续 user 消息违反 API 交替规则
+    let envReminderPrefix = "";
     if (!this.envReminderInjected) {
       this.envReminderInjected = true;
       const envReminder = this.buildEnvReminder();
       if (envReminder) {
-        const envMsg: Message = {
-          role: "user",
-          content: wrapReminder(envReminder),
-          timestamp: new Date().toISOString(),
-        };
-        this.messages.unshift(envMsg);
-        appendMessage(this.historyPath, envMsg);
+        envReminderPrefix = wrapReminder(envReminder) + "\n\n";
       }
     }
 
-    // 用户消息
+    // 用户消息（reminder + 用户输入合并为一条消息）
     const userMsg: Message = {
       role: "user",
-      content: text,
+      content: envReminderPrefix + text,
       timestamp: new Date().toISOString(),
     };
     this.messages.push(userMsg);
