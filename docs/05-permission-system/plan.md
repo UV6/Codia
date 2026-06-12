@@ -168,7 +168,8 @@ class RuleEngine {
   constructor(globalPath?: string, projectPath?: string, localPath?: string);
   load(): Promise<void>;                                    // 加载三层 YAML
   check(request: PermissionRequest): PermissionResult | null;
-  addRule(rule: Rule): void;                                // 添加会话级临时规则
+  addRule(rule: Rule): void;                                // 添加会话级临时规则（不持久化）
+  persistRule(rule: Rule): Promise<void>;                   // 写入 permissions.local.yaml（持久化）
 }
 ```
 
@@ -179,6 +180,7 @@ class RuleEngine {
     - "Bash(git *): allow"
     - "Bash(rm *): deny"
     - "Write(**/*.env): deny"
+    - "Bash: allow"              # 等价于 Bash(*): allow，匹配所有 Bash 调用
   ```
 - 解析：用正则拆出工具名、模式字符串、动作
 - 匹配：用 minimatch 做 global pattern 匹配
@@ -241,7 +243,7 @@ class PermissionChecker {
 **回调内部（由 TUI 实现，不在本模块）：**
 - 展示工具调用摘要和询问原因
 - 等待用户输入（是/否/始终允许）
-- 「始终允许」——回调内部调用 `ruleEngine.addRule()` 写规则到 `permissions.local.yaml`
+- 「始终允许」——回调内部调用 `ruleEngine.persistRule()` 写入 `permissions.local.yaml`
 
 ### ToolScheduler 改动
 
@@ -253,7 +255,7 @@ class PermissionChecker {
                                               → deny  → 返回 PermissionResult 作为 ToolResult
 ```
 
-- 仅 destructive（有副作用）工具走权限检查，只读工具直接放行
+- 所有工具都经过 PermissionChecker（允许 Layer 3 规则拦截只读工具，如 `Read(**/*.secret): deny`）
 - 权限拒绝时构造一个 `status: "error"` + `permissionDenied: true` 的 ToolResult
 - 不抛异常，让 Agent Loop 正常处理
 

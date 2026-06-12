@@ -97,7 +97,8 @@
    - constructor 接受三个可选路径
    - `load()`——加载三层 YAML，文件不存在不报错
    - `check(request)`——先遍历三层找 deny（命中任意层立即返回），无 deny 再遍历三层找 allow（命中任何一层返回 allow），都无返回 null
-   - `addRule(rule)`——添加会话级临时规则到内存
+   - `addRule(rule)`——添加会话级临时规则到内存（不持久化）
+   - `persistRule(rule)`——序列化规则写入 permissions.local.yaml（持久化）
 5. 实现 `buildMatchString(toolName, params)`——构造 `工具名(参数摘要)` 字符串用于规则匹配
 
 **验证：** `pnpm typecheck` 通过
@@ -113,7 +114,7 @@
    - Layer 2: 调用 pathSandbox.check()
    - Layer 3: 调用 ruleEngine.check()
    - Layer 4: 调用 modeEvaluator.evaluate()，allow/deny 直接返回，ask 进入 Layer 5
-   - Layer 5: 调用 humanCallback，处理返回值（yes → allow, no → deny, always_allow → allow + 调用 ruleEngine.addRule()）
+   - Layer 5: 调用 humanCallback，处理返回值（yes → allow, no → deny, always_allow → allow + 调用 ruleEngine.persistRule()）
 
 **验证：** `pnpm typecheck` 通过
 
@@ -142,16 +143,25 @@
 **依赖：** T7、T9
 **步骤：**
 1. schedule 方法新增 PermissionChecker 可选参数
-2. 在 executeTool 调用前插入检查：
-   - 只读工具跳过检查
-   - 构造 PermissionRequest
-   - 调用 permissionChecker.check()
+2. 对每个 ToolCall 构造 PermissionRequest，调用 permissionChecker.check()：
    - deny → 构造 permissionDenied 的 ToolResult，不执行工具
    - allow → 正常调用 executeTool
 
 **验证：** `pnpm typecheck` 通过
 
-## T11: Blocklist 测试
+## T11: 修改 CLI 入口支持 --permission-mode 参数
+
+**文件：** `bin/codia.tsx`
+**依赖：** T1
+**步骤：**
+1. 在 `parseArgs` 的 options 中新增 `permission-mode` 参数项（type: "string"）
+2. 解析参数值，校验是否为合法的 PermissionMode（"default" | "acceptsEdit" | "plan" | "bypassPermissions"），非法值给出提示
+3. 默认值为 "default"
+4. 将解析后的 permissionMode 传入 ChatService/AgentLoopConfig
+
+**验证：** `pnpm typecheck` 通过
+
+## T12: Blocklist 测试
 
 **文件：** `src/__tests__/permission/blocklist.test.ts`
 **依赖：** T3
@@ -164,7 +174,7 @@
 
 **验证：** `pnpm test -- blocklist` 通过
 
-## T12: PathSandbox 测试
+## T13: PathSandbox 测试
 
 **文件：** `src/__tests__/permission/path-sandbox.test.ts`
 **依赖：** T4
@@ -177,21 +187,23 @@
 
 **验证：** `pnpm test -- path-sandbox` 通过
 
-## T13: RuleEngine 测试
+## T14: RuleEngine 测试
 
 **文件：** `src/__tests__/permission/rule-engine.test.ts`
 **依赖：** T6
 **步骤：**
 1. 测试精确匹配 `Bash(git status)` 生效
 2. 测试 glob 匹配 `Bash(git *)` 生效
-3. 测试 deny-anywhere：本地 deny 覆盖项目级 allow
-4. 测试三层优先级：本地 > 项目 > 全局
-5. 测试无匹配规则返回 null
-6. 测试 addRule 添加临时规则并生效
+3. 测试 globstar 模式 `Read(**/*.md)` 匹配深层路径 `read_file docs/sub/deep/file.md`
+4. 测试 deny-anywhere：本地 deny 覆盖项目级 allow
+5. 测试三层优先级：本地 > 项目 > 全局
+6. 测试无匹配规则返回 null
+7. 测试 addRule 添加临时规则并生效
+8. 测试 persistRule 写入文件并重新加载后生效
 
 **验证：** `pnpm test -- rule-engine` 通过
 
-## T14: ModeEvaluator 测试
+## T15: ModeEvaluator 测试
 
 **文件：** `src/__tests__/permission/mode-evaluator.test.ts`
 **依赖：** T2
@@ -203,7 +215,7 @@
 
 **验证：** `pnpm test -- mode-evaluator` 通过
 
-## T15: PermissionChecker 集成测试
+## T16: PermissionChecker 集成测试
 
 **文件：** `src/__tests__/permission/checker.test.ts`
 **依赖：** T7
@@ -225,17 +237,18 @@ T1 (types)
  ├─ T3 (blocklist)
  ├─ T4 (path sandbox)
  ├─ T5 (minimatch) → T6 (rule engine)
- └─ T9 (modify existing types)
+ ├─ T9 (modify existing types)
+ └─ T11 (CLI --permission-mode)
 
 T2 + T3 + T4 + T6 → T7 (checker) → T8 (index)
 
 T7 + T9 → T10 (modify scheduler)
 
-T3 → T11 (blocklist test)
-T4 → T12 (sandbox test)
-T6 → T13 (rule engine test)
-T2 → T14 (mode evaluator test)
-T7 → T15 (checker test)
+T3 → T12 (blocklist test)
+T4 → T13 (sandbox test)
+T6 → T14 (rule engine test)
+T2 → T15 (mode evaluator test)
+T7 → T16 (checker test)
 
-T10 + T11 + T12 + T13 + T14 + T15 → 全量测试通过
+T10 + T11 + T12 + T13 + T14 + T15 + T16 → 全量测试通过
 ```
