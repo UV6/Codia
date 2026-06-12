@@ -162,6 +162,7 @@ export class AnthropicProvider implements LLMProvider {
       stream: true,
     };
 
+
     // systemPrompt 直接放入 system 数组（稳定内容，缓存友好）
     if (systemPrompt) {
       body.system = [{ type: "text", text: systemPrompt }];
