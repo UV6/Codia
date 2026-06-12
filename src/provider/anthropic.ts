@@ -11,8 +11,9 @@ export class AnthropicProvider implements LLMProvider {
     config: ChatConfig,
     signal: AbortSignal,
     tools?: Record<string, unknown>[],
+    systemPrompt?: string,
   ): AsyncIterable<Chunk> {
-    const body = this.buildRequestBody(messages, config, tools);
+    const body = this.buildRequestBody(messages, config, tools, systemPrompt);
     const url = `${config.baseUrl}/v1/messages`;
 
     let response: Response;
@@ -115,12 +116,10 @@ export class AnthropicProvider implements LLMProvider {
     messages: Message[],
     config: ChatConfig,
     tools?: Record<string, unknown>[],
+    systemPrompt?: string,
   ): Record<string, unknown> {
-    const systemMessages = messages.filter((m) => m.role === "system");
-    const conversationMessages = messages.filter((m) => m.role !== "system");
-
-    // 转换消息为 Anthropic 格式
-    const formattedMessages = conversationMessages.map((m) => {
+    // 转换消息为 Anthropic 格式（调用方保证 messages 不含 system role）
+    const formattedMessages = messages.map((m) => {
       // assistant 消息含 toolCalls → 构建 content blocks
       if (m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0) {
         const blocks: Record<string, unknown>[] = [];
@@ -163,8 +162,9 @@ export class AnthropicProvider implements LLMProvider {
       stream: true,
     };
 
-    if (systemMessages.length > 0) {
-      body.system = systemMessages.map((m) => ({ type: "text", text: m.content }));
+    // systemPrompt 直接放入 system 数组（稳定内容，缓存友好）
+    if (systemPrompt) {
+      body.system = [{ type: "text", text: systemPrompt }];
     }
 
     // 工具列表

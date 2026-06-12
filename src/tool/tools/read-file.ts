@@ -32,7 +32,7 @@ function isBinary(filePath: string): boolean {
 export const readFileTool: Tool = {
   name: "read_file",
   description:
-    "读取指定文件的内容。对于文本文件返回带行号的内容；二进制文件无法直接读取。",
+    "读取指定文件的内容。对于文本文件返回带行号的内容；二进制文件无法直接读取。编辑文件前必须先用本工具读取文件内容。",
   type: "file",
   readOnly: true,
   destructive: false,

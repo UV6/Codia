@@ -64,7 +64,7 @@ function generateDiffPreview(
 export const editFileTool: Tool = {
   name: "edit_file",
   description:
-    "通过精确的原文匹配替换来编辑文件。需要提供要替换的原文和替换后的新文本。如果匹配不唯一，会自动扩展匹配上下文。",
+    "通过精确的原文匹配替换来编辑文件。需要提供要替换的原文和替换后的新文本。如果匹配不唯一，会自动扩展匹配上下文。调用前必须先用 read_file 读取文件确认当前内容。old_string 必须与文件原文完全一致。",
   type: "file",
   readOnly: false,
   destructive: true,

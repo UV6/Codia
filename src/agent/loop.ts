@@ -4,6 +4,8 @@ import type { ToolRegistry } from "../tool/registry.js";
 import { StreamCollector } from "./stream-collector.js";
 import { ToolScheduler } from "./tool-scheduler.js";
 import { filterReadOnlyTools } from "./plan-mode.js";
+import { reminderToMessage } from "../prompt/reminders.js";
+import type { ReminderProvider, SystemReminder } from "../prompt/types.js";
 import type {
   AgentEvent,
   AgentLoopConfig,
@@ -30,6 +32,8 @@ export class AgentLoop {
     config: AgentLoopConfig,
     signal: AbortSignal,
     cwd: string = process.cwd(),
+    systemPrompt?: string,
+    getReminders?: ReminderProvider,
   ): AsyncIterable<AgentEvent> {
     const maxRounds = config.maxRounds || DEFAULT_MAX_ROUNDS;
     const allTools = this.registry.getAll();
@@ -46,12 +50,17 @@ export class AgentLoop {
           ? filterReadOnlyTools(allTools)
           : allToolMetas;
 
-      // 2. 调用 LLM 流
+      // 2. 获取本轮 reminders，构建临时消息列表（reminders 不持久化到 messages）
+      const reminders = getReminders?.(round) ?? [];
+      const roundMessages = this.buildRoundMessages(messages, reminders);
+
+      // 3. 调用 LLM 流
       const stream = provider.streamChat(
-        messages,
+        roundMessages,
         chatConfig,
         signal,
         toolMetas as unknown as Record<string, unknown>[],
+        systemPrompt,
       );
 
       const collector = new StreamCollector(stream);
@@ -152,5 +161,33 @@ export class AgentLoop {
     if (round >= maxRounds) {
       yield { type: "stopped", reason: "max_rounds" };
     }
+  }
+
+  // buildRoundMessages —— 构建当轮的临时消息列表，注入 reminders
+  // reminders 插入到最后一个 user 消息之前，不污染原始 messages 数组
+  private buildRoundMessages(messages: Message[], reminders: SystemReminder[]): Message[] {
+    if (reminders.length === 0) return messages;
+
+    const reminderMsgs = reminders.map((r) => reminderToMessage(r));
+    const roundMessages = [...messages];
+
+    // 找到最后一个 user role 消息的位置
+    let lastUserIdx = -1;
+    for (let i = roundMessages.length - 1; i >= 0; i--) {
+      if (roundMessages[i].role === "user") {
+        lastUserIdx = i;
+        break;
+      }
+    }
+
+    if (lastUserIdx >= 0) {
+      // 在最后一个 user 消息之前插入 reminders
+      roundMessages.splice(lastUserIdx, 0, ...reminderMsgs);
+    } else {
+      // 没有 user 消息，追加到末尾
+      roundMessages.push(...reminderMsgs);
+    }
+
+    return roundMessages;
   }
 }

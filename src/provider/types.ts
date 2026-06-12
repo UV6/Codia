@@ -44,5 +44,6 @@ export interface LLMProvider {
     config: ChatConfig,
     signal: AbortSignal,
     tools?: Record<string, unknown>[],
+    systemPrompt?: string,
   ): AsyncIterable<Chunk>;
 }

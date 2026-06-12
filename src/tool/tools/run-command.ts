@@ -29,7 +29,7 @@ function truncateOutput(output: string): string {
 export const runCommandTool: Tool = {
   name: "run_command",
   description:
-    "在终端中执行指定的 shell 命令。返回合并的标准输出和错误输出以及退出码。默认超时 30 秒。",
+    "在终端中执行指定的 shell 命令。返回合并的标准输出和错误输出以及退出码。默认超时 30 秒。优先使用专用工具（read_file、edit_file、glob、grep）而非 cat、sed、echo 等 shell 命令。",
   type: "shell",
   readOnly: false,
   destructive: true,

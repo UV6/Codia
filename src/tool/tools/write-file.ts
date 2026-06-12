@@ -13,7 +13,7 @@ const inputSchema: ToolInputSchema = {
 
 export const writeFileTool: Tool = {
   name: "write_file",
-  description: "创建新文件或覆盖已有文件。父目录不存在时会自动创建。",
+  description: "创建新文件或覆盖已有文件。父目录不存在时会自动创建。覆盖已有文件前必须先用 read_file 确认当前内容。",
   type: "file",
   readOnly: false,
   destructive: true,

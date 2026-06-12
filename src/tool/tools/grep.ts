@@ -17,7 +17,7 @@ const inputSchema: ToolInputSchema = {
 export const grepTool: Tool = {
   name: "grep",
   description:
-    "在文件中搜索匹配的文字或正则表达式。返回匹配行及其文件路径和行号。适合查找代码中的函数、类、变量等定义。",
+    "在文件中搜索匹配的文字或正则表达式。返回匹配行及其文件路径和行号。适合查找代码中的函数、类、变量等定义。搜索代码符号时优先用 codegraph_search 工具。",
   type: "search",
   readOnly: true,
   destructive: false,

@@ -11,8 +11,9 @@ export class OpenAIProvider implements LLMProvider {
     config: ChatConfig,
     signal: AbortSignal,
     tools?: Record<string, unknown>[],
+    systemPrompt?: string,
   ): AsyncIterable<Chunk> {
-    const body = this.buildRequestBody(messages, config);
+    const body = this.buildRequestBody(messages, config, systemPrompt);
     const url = `${config.baseUrl}/v1/chat/completions`;
 
     let response: Response;
@@ -63,9 +64,12 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   // buildRequestBody —— 构建 OpenAI API 请求体
-  private buildRequestBody(messages: Message[], config: ChatConfig): Record<string, unknown> {
-    // OpenAI 支持 system role，直接透传（去掉 thinking 字段）
-    const formattedMessages = messages.map((m) => ({
+  private buildRequestBody(messages: Message[], config: ChatConfig, systemPrompt?: string): Record<string, unknown> {
+    // 如果 systemPrompt 非空，在 messages 头部插入 system role 消息
+    const formattedMessages = (systemPrompt
+      ? [{ role: "system" as const, content: systemPrompt }, ...messages]
+      : messages
+    ).map((m) => ({
       role: m.role,
       content: m.content,
     }));

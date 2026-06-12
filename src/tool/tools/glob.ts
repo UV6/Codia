@@ -16,7 +16,7 @@ const inputSchema: ToolInputSchema = {
 export const globTool: Tool = {
   name: "glob",
   description:
-    "按模式匹配文件路径。支持 ** 递归匹配子目录，如 src/**/*.ts 匹配 src 下所有 TypeScript 文件。",
+    "按模式匹配文件路径。支持 ** 递归匹配子目录，如 src/**/*.ts 匹配 src 下所有 TypeScript 文件。查找文件时优先用本工具而非 ls 或 find 命令。",
   type: "search",
   readOnly: true,
   destructive: false,
