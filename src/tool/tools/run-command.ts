@@ -99,7 +99,7 @@ export const runCommandTool: Tool = {
 
       const output = truncateOutput(combinedOutput || "(无输出)");
 
-      const content = `<output>\n${output}\n</output>\n<exit_code>${result.exitCode}</exit_code>`;
+      const content = `${output}\n\n退出码: ${result.exitCode}`;
 
       return {
         status: ok ? "success" : "error",
@@ -114,13 +114,13 @@ export const runCommandTool: Tool = {
       if (errMsg.includes("超时")) {
         return {
           status: "error",
-          content: `<output>\n(命令执行超时，${timeoutSec} 秒后被终止)\n</output>\n<exit_code>-1</exit_code>`,
+          content: `(命令执行超时，${timeoutSec} 秒后被终止)`,
           metadata: { duration: Date.now() - startTime },
         };
       }
       return {
         status: "error",
-        content: `<output>\n命令执行失败：${errMsg}\n</output>\n<exit_code>-1</exit_code>`,
+        content: `命令执行失败：${errMsg}`,
         metadata: { duration: Date.now() - startTime },
       };
     }
