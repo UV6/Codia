@@ -88,12 +88,11 @@ export class PermissionChecker {
     }
 
     if (choice === "always_allow") {
-      // 持久化 allow 规则
+      // 持久化 allow 规则：匹配该工具的所有调用（不区分参数）
       const shortName = getShortName(request.toolName);
-      const paramSummary = extractParamSummary(request.toolName, request.params);
       await this.ruleEngine.persistRule({
         toolPattern: shortName,
-        paramPattern: paramSummary || "*",
+        paramPattern: "*",
         action: "allow",
         source: "local",
       });
