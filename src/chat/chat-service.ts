@@ -105,6 +105,11 @@ export class ChatService {
     return this.mode;
   }
 
+  // 设置人在回路回调（由 TUI 注入）
+  setHumanInTheLoop(callback: HumanInTheLoopCallback): void {
+    this.humanInTheLoop = callback;
+  }
+
   async *sendMessage(text: string): AsyncIterable<AgentEvent> {
     this.cancel();
     this.abortController = new AbortController();

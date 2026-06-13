@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Box } from "ink";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Box, Text } from "ink";
 import { useInput } from "ink";
 import { InputBox } from "./input-box.js";
 import { ChatView } from "./chat-view.js";
@@ -7,6 +7,7 @@ import { ThinkingBox } from "./thinking-box.js";
 import { StatusBar } from "./status-bar.js";
 import type { Message } from "../provider/types.js";
 import type { ChatService } from "../chat/chat-service.js";
+import type { HumanChoice, HumanPrompt } from "../permission/types.js";
 
 interface AppProps {
   service: ChatService;
@@ -23,13 +24,55 @@ export function App({ service }: AppProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
 
+  // 权限确认状态
+  const [permissionPrompt, setPermissionPrompt] = useState<HumanPrompt | null>(null);
+  // 用 ref 存储 resolve 回调，避免放到 state 里
+  const permissionResolveRef = useRef<((choice: HumanChoice) => void) | null>(null);
+
+  // 人在回路回调：设置状态 + 返回 Promise
+  const humanInTheLoop = useCallback((prompt: HumanPrompt): Promise<HumanChoice> => {
+    return new Promise<HumanChoice>((resolve) => {
+      permissionResolveRef.current = resolve;
+      setPermissionPrompt(prompt);
+    });
+  }, []);
+
+  // 注入回调到 ChatService
+  useEffect(() => {
+    service.setHumanInTheLoop(humanInTheLoop);
+  }, [service, humanInTheLoop]);
+
   // 订阅用量回调
   useEffect(() => {
     service.onUsage = (u) => setUsage(u);
   }, [service]);
 
-  // Ctrl+C 取消流式
+  // 权限确认按键处理（只在权限弹窗激活时）
   useInput((input, key) => {
+    if (!permissionPrompt) return;
+
+    const resolve = permissionResolveRef.current;
+    if (!resolve) return;
+
+    const ch = input.toLowerCase();
+    if (ch === "y") {
+      permissionResolveRef.current = null;
+      setPermissionPrompt(null);
+      resolve("yes");
+    } else if (ch === "n") {
+      permissionResolveRef.current = null;
+      setPermissionPrompt(null);
+      resolve("no");
+    } else if (ch === "a") {
+      permissionResolveRef.current = null;
+      setPermissionPrompt(null);
+      resolve("always_allow");
+    }
+  });
+
+  // Ctrl+C / Ctrl+T
+  useInput((input, key) => {
+    if (permissionPrompt) return; // 权限弹窗激活时不响应其他按键
     if (key.ctrl && input === "c" && isStreaming) {
       service.cancel();
     }
@@ -108,6 +151,29 @@ export function App({ service }: AppProps) {
         toolStatus={toolStatus}
       />
 
+      {/* 权限确认弹窗 */}
+      {permissionPrompt && (
+        <Box flexDirection="column" marginTop={1}>
+          <Box>
+            <Text color="yellow" bold>🔒 权限确认</Text>
+          </Box>
+          <Box marginTop={1}>
+            <Text>操作：</Text>
+            <Text bold>{permissionPrompt.toolCall}</Text>
+          </Box>
+          <Box>
+            <Text dimColor>原因：{permissionPrompt.reason}</Text>
+          </Box>
+          <Box marginTop={1}>
+            <Text color="green">[y] 是</Text>
+            <Text>  </Text>
+            <Text color="red">[n] 否</Text>
+            <Text>  </Text>
+            <Text color="cyan">[a] 始终允许</Text>
+          </Box>
+        </Box>
+      )}
+
       {streamingThinking && (
         <ThinkingBox thinking={streamingThinking} collapsed={thinkingCollapsed} />
       )}
@@ -118,7 +184,7 @@ export function App({ service }: AppProps) {
         streaming={isStreaming}
       />
 
-      <InputBox onSubmit={handleSubmit} disabled={isStreaming} error={error ?? undefined} />
+      <InputBox onSubmit={handleSubmit} disabled={isStreaming || !!permissionPrompt} error={error ?? undefined} />
     </Box>
   );
 }
