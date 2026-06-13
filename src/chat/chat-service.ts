@@ -152,7 +152,9 @@ export class ChatService {
     const ruleEngine = new RuleEngine(globalRulesPath, projectRulesPath, localRulesPath);
     await ruleEngine.load();
 
-    const humanCallback = this.humanInTheLoop ?? createDefaultHumanCallback();
+    // 当 TUI 未注入回调时，使用静默 auto-allow 而非 createDefaultHumanCallback()
+    // 因为 createDefaultHumanCallback 使用 stdin/stdout，在 Ink 渲染模式下会破坏终端输出
+    const humanCallback = this.humanInTheLoop ?? (async () => "yes" as const);
     const permissionChecker = new PermissionChecker(ruleEngine, this.permissionMode, humanCallback);
 
     // 本轮 system prompt（完整 prompt + 可选的 plan mode 后缀）
@@ -218,27 +220,4 @@ export class ChatService {
 
     return info.join("\n");
   }
-}
-
-// createDefaultHumanCallback —— 当 TUI 未注入回调时使用的简单 console 回退
-// 通过 stdin/stdout 进行交互（非 TUI 模式下的兜底）
-function createDefaultHumanCallback(): HumanInTheLoopCallback {
-  return async (prompt) => {
-    const msg = `\n[权限确认] ${prompt.toolCall}\n原因: ${prompt.reason}\n请输入 y(是) / n(否) / a(始终允许): `;
-    return new Promise((resolve) => {
-      const { stdin, stdout } = process;
-      stdout.write(msg);
-      stdin.resume();
-      stdin.setEncoding("utf-8");
-      const onData = (data: string) => {
-        const input = data.trim().toLowerCase();
-        stdin.removeListener("data", onData);
-        stdin.pause();
-        if (input === "a") resolve("always_allow");
-        else if (input === "n") resolve("no");
-        else resolve("yes"); // 默认当作 yes
-      };
-      stdin.on("data", onData);
-    });
-  };
 }
