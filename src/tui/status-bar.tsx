@@ -14,7 +14,7 @@ export function StatusBar({ model, usage, streaming }: StatusBarProps) {
         Model: {model}
       </Text>
       {streaming && (
-        <Text dimColor> ...</Text>
+        <Text dimColor> 回答中...</Text>
       )}
       {usage && !streaming && (
         <Text dimColor>
