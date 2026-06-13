@@ -9,23 +9,22 @@ import { listSessions, sessionPath, newSessionPath } from "../src/chat/history.j
 import { App } from "../src/tui/app.js";
 import type { PermissionMode } from "../src/permission/types.js";
 
-const VALID_PERMISSION_MODES: PermissionMode[] = [
-  "default",
-  "acceptsEdit",
-  "plan",
-  "bypassPermissions",
-];
-
 const usage = `
 codia — 终端 AI 编程助手
 
 用法: codia [选项]
 
 选项:
-  --session, -s <id>       继续指定的会话
-  --sessions, -ls           列出所有历史会话
-  --permission-mode <mode>  权限模式：default / acceptsEdit / plan / bypassPermissions（默认 default）
-  --help, -h                显示帮助信息
+  --session, -s <id>     继续指定的会话
+  --sessions, -ls         列出所有历史会话
+  --bypassPermissions     启动时进入 bypassPermissions 模式（跳过权限确认，仅保留黑名单）
+  --help, -h              显示帮助信息
+
+运行时命令:
+  /default        切换为 default 权限模式
+  /acceptsEdit    切换为 acceptsEdit 权限模式
+  /plan <需求>    进入 plan 模式（自动切换为 plan 权限模式）
+  /do             退出 plan 模式
 `.trim();
 
 async function main() {
@@ -34,7 +33,7 @@ async function main() {
     options: {
       session: { type: "string", short: "s" },
       sessions: { type: "boolean", short: "l" },
-      "permission-mode": { type: "string" },
+      bypassPermissions: { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
     strict: false,
@@ -68,19 +67,10 @@ async function main() {
     process.exit(0);
   }
 
-  // 解析权限模式
-  let permissionMode: PermissionMode = "default";
-  if (typeof values["permission-mode"] === "string") {
-    const input = values["permission-mode"] as string;
-    if ((VALID_PERMISSION_MODES as string[]).includes(input)) {
-      permissionMode = input as PermissionMode;
-    } else {
-      console.error(
-        `无效的权限模式：${input}。支持：${VALID_PERMISSION_MODES.join(", ")}`,
-      );
-      process.exit(1);
-    }
-  }
+  // 权限模式：只有 --bypassPermissions 才能启动 bypass 模式
+  const permissionMode: PermissionMode = values.bypassPermissions
+    ? "bypassPermissions"
+    : "default";
 
   // 加载配置
   let appConfig;

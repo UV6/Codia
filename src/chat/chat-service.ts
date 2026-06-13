@@ -116,13 +116,25 @@ export class ChatService {
     const signal = this.abortController.signal;
 
     // 解析命令
-    if (isPlanCommand(text)) {
+    if (isPermissionDefaultCommand(text)) {
+      this.permissionMode = "default";
+      yield { type: "tool_status", name: "mode", param: "default" };
+      return;
+    } else if (isPermissionAcceptsEditCommand(text)) {
+      this.permissionMode = "acceptsEdit";
+      yield { type: "tool_status", name: "mode", param: "acceptsEdit" };
+      return;
+    } else if (isPlanCommand(text)) {
+      // /plan 同时设置 agent plan mode 和 permission plan mode
       this.mode = "plan";
+      this.permissionMode = "plan";
       const planMessage = extractPlanMessage(text) || "请分析需求并写入执行计划";
       text = planMessage;
     } else if (isDoCommand(text)) {
       if (this.mode === "plan") {
         this.mode = "full";
+        // 退出 plan mode 时恢复 permission mode 为 default
+        this.permissionMode = "default";
         return;
       }
       return;
@@ -225,4 +237,14 @@ export class ChatService {
 
     return info.join("\n");
   }
+}
+
+// isPermissionDefaultCommand —— 匹配 /default
+function isPermissionDefaultCommand(text: string): boolean {
+  return /^\/default\s*$/.test(text.trim());
+}
+
+// isPermissionAcceptsEditCommand —— 匹配 /acceptsEdit
+function isPermissionAcceptsEditCommand(text: string): boolean {
+  return /^\/acceptsEdit\s*$/.test(text.trim());
 }
