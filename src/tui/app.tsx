@@ -81,8 +81,12 @@ export function App({ service }: AppProps) {
           case "error":
             setError(chunk.error.message);
             break;
-          case "done":
-            // 流结束后从 service 同步完整消息历史
+          case "tool_result":
+            // 工具执行完后同步消息历史，让 ChatView 显示命令输出
+            setMessages(service.history);
+            break;
+          case "stopped":
+            // AgentLoop 停止后从 service 同步完整消息历史
             setMessages(service.history);
             setStreamingContent("");
             setStreamingThinking("");
