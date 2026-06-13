@@ -151,7 +151,7 @@ describe("AgentLoop", () => {
     expect(messages[0].role).toBe("assistant");
     expect(messages[0].toolCalls).toHaveLength(1);
     expect(messages[1].role).toBe("user");
-    expect(messages[1].toolResult).toBeDefined();
+    expect(messages[1].toolResults).toHaveLength(1);
     expect(messages[2].role).toBe("assistant");
     expect(messages[2].content).toBe("Done reading!");
   });

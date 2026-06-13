@@ -137,7 +137,19 @@ export class AnthropicProvider implements LLMProvider {
         return { role: "assistant", content: blocks };
       }
 
-      // user 消息含 toolResult → tool_result content
+      // user 消息含多个 toolResults → 合并为一条 user 消息
+      if (m.role === "user" && m.toolResults && m.toolResults.length > 0) {
+        return {
+          role: "user",
+          content: m.toolResults.map((tr) => ({
+            type: "tool_result" as const,
+            tool_use_id: tr.toolUseId,
+            content: tr.result.content,
+          })),
+        };
+      }
+
+      // user 消息含单个 toolResult → tool_result content（兼容旧格式）
       if (m.role === "user" && m.toolResult) {
         return {
           role: "user",

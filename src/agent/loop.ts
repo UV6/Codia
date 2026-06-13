@@ -140,16 +140,18 @@ export class AgentLoop {
         break;
       }
 
-      // 9. 工具结果回灌到消息历史
-      for (const r of toolResults) {
-        const toolResultMsg: Message = {
+      // 9. 工具结果回灌到消息历史（所有结果合并为一条 user 消息）
+      if (toolResults.length > 0) {
+        const combinedMsg: Message = {
           role: "user",
-          content: r.result.content,
+          content: toolResults.map((r) => r.result.content).join("\n\n"),
           timestamp: new Date().toISOString(),
-          toolResult: r.result,
-          toolUseId: r.callId,
+          toolResults: toolResults.map((r) => ({
+            toolUseId: r.callId,
+            result: r.result,
+          })),
         };
-        messages.push(toolResultMsg);
+        messages.push(combinedMsg);
       }
 
       round++;

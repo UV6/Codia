@@ -20,8 +20,9 @@ export interface Message {
   };
   thinking?: string; // Claude extended thinking 内容
   toolCalls?: ToolCall[]; // assistant 消息可能含工具调用
-  toolResult?: ToolResult; // user-like 消息含工具执行结果
-  toolUseId?: string; // 关联 tool_result 和 tool_use
+  toolResult?: ToolResult; // user-like 消息含单个工具执行结果（兼容旧格式）
+  toolUseId?: string; // 关联单个 tool_result 和 tool_use（兼容旧格式）
+  toolResults?: Array<{ toolUseId: string; result: ToolResult }>; // 同轮多个工具结果
 }
 
 // Chunk —— Provider 流式输出的最小单元
