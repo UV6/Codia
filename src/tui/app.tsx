@@ -37,6 +37,11 @@ export function App({ service }: AppProps) {
     });
   }, []);
 
+  // MCP 初始化（仅首次挂载时执行）
+  useEffect(() => {
+    service.init();
+  }, [service]);
+
   // 注入回调到 ChatService
   useEffect(() => {
     service.setHumanInTheLoop(humanInTheLoop);

@@ -32,6 +32,8 @@ import { join } from "node:path";
 import type { PermissionMode, HumanInTheLoopCallback } from "../permission/types.js";
 import { RuleEngine } from "../permission/rule-engine.js";
 import { PermissionChecker } from "../permission/checker.js";
+import { ConnectionManager } from "../mcp/manager.js";
+import { loadMcpConfig } from "../mcp/config.js";
 
 // ChatService —— 对话核心
 // 负责消息历史管理、会话持久化、命令解析，循环逻辑委托给 AgentLoop
@@ -52,6 +54,9 @@ export class ChatService {
   // 权限系统配置
   private permissionMode: PermissionMode;
   private humanInTheLoop?: HumanInTheLoopCallback;
+
+  // MCP 连接管理器
+  private mcpManager: ConnectionManager | null = null;
 
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
@@ -94,6 +99,27 @@ export class ChatService {
     const basePrompt = builder.build();
     const envInfo = this.buildEnvInfo();
     this.fullSystemPrompt = envInfo ? `${basePrompt}\n\n${envInfo}` : basePrompt;
+  }
+
+  // init —— 异步初始化：加载 MCP 配置并连接外部 Server
+  async init(): Promise<void> {
+    try {
+      const mcpConfig = loadMcpConfig();
+      const serverCount = Object.keys(mcpConfig.servers).length;
+      if (serverCount > 0) {
+        this.mcpManager = new ConnectionManager();
+        await this.mcpManager.connectAll(mcpConfig, this.registry);
+      }
+    } catch (e) {
+      console.error(`[MCP] 初始化失败：${(e as Error).message}`);
+    }
+  }
+
+  // disconnect —— 断开 MCP 连接并释放资源
+  async disconnect(): Promise<void> {
+    if (this.mcpManager) {
+      await this.mcpManager.disconnectAll();
+    }
   }
 
   get history(): Message[] {

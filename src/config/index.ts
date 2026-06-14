@@ -23,6 +23,7 @@ export interface AgentLoopYamlConfig {
 // AppConfig —— 完整应用配置
 export interface AppConfig extends ChatConfig {
   agentLoop: AgentLoopYamlConfig;
+  mcp?: { servers: Record<string, Record<string, unknown>> }; // mcp_servers 段原始值，不做展开（展开在 mcp/config.ts 中）
 }
 
 const REQUIRED_FIELDS = ["protocol", "model", "base_url", "api_key"] as const;
@@ -93,10 +94,14 @@ export function loadAppConfig(path: string = DEFAULT_CONFIG_PATH): AppConfig {
   const parsed = parse(raw) as Record<string, unknown>;
   const agentLoop = (parsed.agent_loop as Record<string, unknown>) ?? {};
 
+  // 解析 mcp_servers 段（原始值，展开和合并在 mcp/config.ts 中处理）
+  const mcpServers = parsed.mcp_servers as Record<string, Record<string, unknown>> | undefined;
+
   return {
     ...chatConfig,
     agentLoop: {
       maxRounds: typeof agentLoop.max_rounds === "number" ? agentLoop.max_rounds : undefined,
     },
+    mcp: mcpServers ? { servers: mcpServers } : undefined,
   };
 }
