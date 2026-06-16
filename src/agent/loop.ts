@@ -5,6 +5,8 @@ import { StreamCollector } from "./stream-collector.js";
 import { ToolScheduler } from "./tool-scheduler.js";
 import { filterReadOnlyTools } from "./plan-mode.js";
 import type { PermissionChecker } from "../permission/checker.js";
+import type { ContextManager } from "../context/manager.js";
+import type { CompressEvent } from "../context/types.js";
 import type {
   AgentEvent,
   AgentLoopConfig,
@@ -19,9 +21,11 @@ export const DEFAULT_MAX_ROUNDS = 20;
 // 驱动 "调用 LLM → 收集响应 → 判断停止 → 分批执行工具 → 结果回灌 → 下一轮"
 export class AgentLoop {
   private registry: ToolRegistry;
+  private contextManager?: ContextManager;
 
-  constructor(registry: ToolRegistry) {
+  constructor(registry: ToolRegistry, contextManager?: ContextManager) {
     this.registry = registry;
+    this.contextManager = contextManager;
   }
 
   async *run(
@@ -48,6 +52,18 @@ export class AgentLoop {
         config.mode === "plan"
           ? filterReadOnlyTools(allTools)
           : allToolMetas;
+
+      // 1.5 上下文压缩检查（每次 API 请求前）
+      if (this.contextManager) {
+        const preResult = await this.contextManager.preRequest(messages, "auto", signal);
+        // 用压缩后的 messages 替换（不影响外部引用）
+        messages.length = 0;
+        messages.push(...preResult.messages);
+        // yield 压缩事件
+        for (const e of preResult.events) {
+          yield e;
+        }
+      }
 
       // 2. 调用 LLM 流（messages 已由 ChatService 组装好，含 reminders）
       const stream = provider.streamChat(
@@ -90,6 +106,10 @@ export class AgentLoop {
           };
           messages.push(finalMsg);
         }
+        // 更新 token 估算锚点
+        if (result.usage && this.contextManager) {
+          this.contextManager.setAnchor(result.usage, messages.length);
+        }
         yield { type: "stopped", reason: "done" };
         break;
       }
@@ -103,6 +123,11 @@ export class AgentLoop {
         usage: result.usage,
       };
       messages.push(assistantMsg);
+
+      // 更新 token 估算锚点
+      if (result.usage && this.contextManager) {
+        this.contextManager.setAnchor(result.usage, messages.length);
+      }
 
       // 6. 调度并执行工具
       const scheduler = new ToolScheduler(this.registry);
@@ -140,15 +165,21 @@ export class AgentLoop {
         break;
       }
 
-      // 9. 工具结果回灌到消息历史（所有结果合并为一条 user 消息）
+      // 9. 轻量压缩：处理超大工具结果
+      let processedResults = toolResults.map((r) => r.result);
+      if (this.contextManager) {
+        processedResults = this.contextManager.compressToolResults(processedResults);
+      }
+
+      // 10. 工具结果回灌到消息历史（所有结果合并为一条 user 消息）
       if (toolResults.length > 0) {
         const combinedMsg: Message = {
           role: "user",
-          content: toolResults.map((r) => r.result.content).join("\n\n"),
+          content: processedResults.map((r) => r.content).join("\n\n"),
           timestamp: new Date().toISOString(),
-          toolResults: toolResults.map((r) => ({
+          toolResults: toolResults.map((r, i) => ({
             toolUseId: r.callId,
-            result: r.result,
+            result: processedResults[i],
           })),
         };
         messages.push(combinedMsg);

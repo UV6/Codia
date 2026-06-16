@@ -1,6 +1,7 @@
 import type { Chunk } from "../provider/types.js";
 import type { ToolCall, ToolResult } from "../tool/types.js";
 import type { PermissionMode, HumanInTheLoopCallback } from "../permission/types.js";
+import type { CompressEvent } from "../context/types.js";
 
 // StopReason —— 循环停止原因
 export type StopReason =
@@ -23,6 +24,7 @@ export interface AgentLoopConfig {
 // 在现有 Chunk 基础上扩展 Agent 层特有事件
 export type AgentEvent =
   | Chunk
+  | CompressEvent
   | { type: "tool_execution_start"; callId: string; name: string }
   | { type: "tool_result"; callId: string; name: string; result: ToolResult }
   | { type: "round_start"; round: number }

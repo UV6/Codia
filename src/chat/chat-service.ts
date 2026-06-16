@@ -16,6 +16,7 @@ import {
   PLAN_MODE_PROMPT,
 } from "../agent/plan-mode.js";
 import type { AgentEvent, AgentLoopConfig } from "../agent/types.js";
+import { ContextManager } from "../context/manager.js";
 import { SystemPromptBuilder } from "../prompt/builder.js";
 import {
   identitySection,
@@ -28,7 +29,7 @@ import {
 } from "../prompt/sections.js";
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import type { PermissionMode, HumanInTheLoopCallback } from "../permission/types.js";
 import { RuleEngine } from "../permission/rule-engine.js";
 import { PermissionChecker } from "../permission/checker.js";
@@ -58,6 +59,9 @@ export class ChatService {
   // MCP 连接管理器
   private mcpManager: ConnectionManager | null = null;
 
+  // 上下文压缩管理器
+  private contextManager: ContextManager;
+
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
 
@@ -85,7 +89,17 @@ export class ChatService {
     this.registry.register(grepTool);
     this.registry.register(runCommandTool);
 
-    this.agentLoop = new AgentLoop(this.registry);
+    // 提取会话 ID（不含扩展名的文件名）
+    const sessionId = basename(historyPath, ".jsonl");
+
+    // 初始化上下文压缩管理器
+    this.contextManager = new ContextManager(
+      this.provider,
+      config,
+      sessionId,
+    );
+
+    this.agentLoop = new AgentLoop(this.registry, this.contextManager);
 
     // 构建完整 System Prompt：七个固定模块 + 环境信息
     const builder = new SystemPromptBuilder();
@@ -142,7 +156,18 @@ export class ChatService {
     const signal = this.abortController.signal;
 
     // 解析命令
-    if (isPermissionDefaultCommand(text)) {
+    if (isCompressCommand(text)) {
+      // /compress —— 手动触发上下文压缩
+      const result = await this.contextManager.preRequest(this.messages, "manual", signal);
+      if (result.events.length > 0) {
+        for (const e of result.events) {
+          yield e;
+        }
+      }
+      // 用压缩后的消息替换当前历史
+      this.messages = result.messages;
+      return;
+    } else if (isPermissionDefaultCommand(text)) {
       this.permissionMode = "default";
       yield { type: "tool_status", name: "mode", param: "default" };
       return;
@@ -268,6 +293,11 @@ export class ChatService {
 // isPermissionDefaultCommand —— 匹配 /default
 function isPermissionDefaultCommand(text: string): boolean {
   return /^\/default\s*$/.test(text.trim());
+}
+
+// isCompressCommand —— 匹配 /compress
+function isCompressCommand(text: string): boolean {
+  return /^\/compress\s*$/.test(text.trim());
 }
 
 // isPermissionAcceptsEditCommand —— 匹配 /acceptsEdit
