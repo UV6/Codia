@@ -56,9 +56,11 @@ export class AgentLoop {
       // 1.5 上下文压缩检查（每次 API 请求前）
       if (this.contextManager) {
         const preResult = await this.contextManager.preRequest(messages, "auto", signal);
-        // 用压缩后的 messages 替换（不影响外部引用）
-        messages.length = 0;
-        messages.push(...preResult.messages);
+        // 只在压缩实际发生时替换（preRequest 未触发压缩时返回同一引用）
+        if (preResult.messages !== messages) {
+          messages.length = 0;
+          messages.push(...preResult.messages);
+        }
         // yield 压缩事件
         for (const e of preResult.events) {
           yield e;
