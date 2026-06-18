@@ -1,5 +1,23 @@
 import type { Section } from "./types.js";
 
+// instructionSection —— 项目指令（priority 0，最靠前）
+export function instructionSection(text: string): Section {
+  return {
+    name: "项目指令",
+    priority: 0,
+    content: text ? `以下项目级别指令适用于本次会话：\n\n${text}` : "",
+  };
+}
+
+// memorySection —— 记忆索引（priority 0.5，在项目指令之后、身份之前）
+export function memorySection(text: string): Section {
+  return {
+    name: "记忆索引",
+    priority: 0.5,
+    content: text ? `以下已沉淀的项目和个人记忆可供参考：\n\n${text}` : "",
+  };
+}
+
 // identitySection —— 身份（priority 1）
 export function identitySection(): Section {
   return {
