@@ -5,7 +5,7 @@ import { basename } from "node:path";
 import { render } from "ink";
 import { loadAppConfig, ConfigError } from "../src/config/index.js";
 import { ChatService } from "../src/chat/chat-service.js";
-import { listSessions, sessionPath, newSessionPath } from "../src/chat/history.js";
+import { listSessions, sessionPath } from "../src/chat/history.js";
 import { App } from "../src/tui/app.js";
 import type { PermissionMode } from "../src/permission/types.js";
 
@@ -87,23 +87,20 @@ async function main() {
 
   // 确定会话文件
   const sessionId = typeof values.session === "string" ? values.session : undefined;
-  const filePath = sessionId
-    ? sessionPath(sessionId)
-    : newSessionPath();
 
   if (sessionId) {
     console.log(`继续会话：${sessionId}`);
-  } else {
-    const id = basename(filePath, ".jsonl");
-    console.log(`新会话：${id}`);
   }
 
-  const service = new ChatService(
-    appConfig,
-    filePath,
-    appConfig.agentLoop.maxRounds,
+  const service = await ChatService.create(appConfig, {
+    resume: sessionId,
+    maxRounds: appConfig.agentLoop.maxRounds,
     permissionMode,
-  );
+  });
+
+  if (!sessionId) {
+    console.log(`新会话：${basename(service.sessionPath, ".jsonl")}`);
+  }
 
   process.on("exit", () => {
     service.cancel();

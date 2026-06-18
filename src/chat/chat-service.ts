@@ -139,7 +139,7 @@ export class ChatService {
     this.registry.register(runCommandTool);
 
     // 提取会话 ID（不含扩展名的文件名）
-    const sessionId = basename(historyPath, ".jsonl");
+    const sessionId = basename(this.historyPath, ".jsonl");
 
     // 初始化上下文压缩管理器
     this.contextManager = new ContextManager(
@@ -194,6 +194,11 @@ export class ChatService {
 
   get history(): Message[] {
     return [...this.messages];
+  }
+
+  // 当前会话文件路径
+  get sessionPath(): string {
+    return this.historyPath;
   }
 
   // 当前模式

@@ -8,7 +8,9 @@ describe("E2E: 工具调用循环", () => {
 
   it.skipIf(SKIP_REASON !== null)(SKIP_REASON ?? "集成测试: read_file", async () => {
     const config = loadConfig();
-    const svc = new ChatService(config, "/tmp/e2e-test-history.jsonl");
+    const svc = await ChatService.create(config, {
+      resume: undefined, // 新会话
+    });
 
     const chunks: string[] = [];
     let toolStatusSeen = false;
@@ -41,7 +43,9 @@ describe("E2E: 工具调用循环", () => {
 
   it.skipIf(SKIP_REASON !== null)(SKIP_REASON ?? "集成测试: run_command", async () => {
     const config = loadConfig();
-    const svc = new ChatService(config, "/tmp/e2e-test-history.jsonl");
+    const svc = await ChatService.create(config, {
+      resume: undefined, // 新会话
+    });
 
     const chunks: string[] = [];
     let toolUseSeen = false;
