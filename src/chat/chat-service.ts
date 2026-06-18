@@ -26,6 +26,8 @@ import {
   toolUseSection,
   toneSection,
   outputSection,
+  instructionSection,
+  memorySection,
 } from "../prompt/sections.js";
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -35,6 +37,11 @@ import { RuleEngine } from "../permission/rule-engine.js";
 import { PermissionChecker } from "../permission/checker.js";
 import { ConnectionManager } from "../mcp/manager.js";
 import { loadMcpConfig } from "../mcp/config.js";
+import { buildNewSessionContext, buildResumeContext } from "../bootstrap/context-builder.js";
+import type { BootstrapContext } from "../bootstrap/types.js";
+import { extractFromTurn } from "../memory/extractor.js";
+import type { MemoryIndexBundle } from "../memory/types.js";
+import { loadIndexes } from "../memory/store.js";
 
 // ChatService —— 对话核心
 // 负责消息历史管理、会话持久化、命令解析，循环逻辑委托给 AgentLoop
@@ -65,20 +72,62 @@ export class ChatService {
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
 
+  // create —— 异步工厂方法，先完成 bootstrap 再构造 ChatService
+  static async create(
+    config: ChatConfig,
+    options: {
+      resume?: string;
+      maxRounds?: number;
+      permissionMode?: PermissionMode;
+      humanInTheLoop?: HumanInTheLoopCallback;
+      projectRoot?: string;
+    } = {},
+  ): Promise<ChatService> {
+    const projectRoot = options.projectRoot ?? process.cwd();
+    const now = new Date();
+    let bootstrapContext: BootstrapContext;
+
+    if (options.resume) {
+      bootstrapContext = buildResumeContext(
+        { projectRoot, now },
+        options.resume,
+      );
+    } else {
+      bootstrapContext = buildNewSessionContext({ projectRoot, now });
+    }
+
+    return new ChatService(
+      config,
+      bootstrapContext,
+      now,
+      { ...options, projectRoot },
+    );
+  }
+
   constructor(
     config: ChatConfig,
-    historyPath: string = newSessionPath(),
-    maxRounds?: number,
-    permissionMode: PermissionMode = "default",
-    humanInTheLoop?: HumanInTheLoopCallback,
+    bootstrapContext: BootstrapContext,
+    now: Date = new Date(),
+    options: {
+      maxRounds?: number;
+      permissionMode?: PermissionMode;
+      humanInTheLoop?: HumanInTheLoopCallback;
+      projectRoot?: string;
+    } = {},
   ) {
     this.config = config;
-    this.historyPath = historyPath;
+    this.historyPath = bootstrapContext.sessionSummary?.path
+      ?? newSessionPath(now, options.projectRoot);
     this.provider = createProvider(config);
-    this.messages = loadHistory(historyPath);
-    this.maxRounds = maxRounds ?? DEFAULT_MAX_ROUNDS;
-    this.permissionMode = permissionMode;
-    this.humanInTheLoop = humanInTheLoop;
+    // 如果有恢复消息则使用它们，否则尝试加载历史文件
+    if (bootstrapContext.recoveredMessages.length > 0) {
+      this.messages = [...bootstrapContext.recoveredMessages];
+    } else {
+      this.messages = loadHistory(this.historyPath);
+    }
+    this.maxRounds = options.maxRounds ?? DEFAULT_MAX_ROUNDS;
+    this.permissionMode = options.permissionMode ?? "default";
+    this.humanInTheLoop = options.humanInTheLoop;
 
     // 注册六个核心工具
     this.registry = new ToolRegistry();
@@ -101,8 +150,15 @@ export class ChatService {
 
     this.agentLoop = new AgentLoop(this.registry, this.contextManager);
 
-    // 构建完整 System Prompt：七个固定模块 + 环境信息
+    // 构建完整 System Prompt：项目指令 + 记忆索引 + 七个固定模块 + 环境信息
     const builder = new SystemPromptBuilder();
+    // 注入恢复后的项目指令与记忆索引
+    if (bootstrapContext.instructionText) {
+      builder.add(instructionSection(bootstrapContext.instructionText));
+    }
+    if (bootstrapContext.memoryText) {
+      builder.add(memorySection(bootstrapContext.memoryText));
+    }
     builder.add(identitySection());
     builder.add(constraintsSection());
     builder.add(taskModeSection());
@@ -254,7 +310,37 @@ export class ChatService {
       appendMessage(this.historyPath, msg);
     }
 
+    // 异步调度记忆提炼
+    this.scheduleMemoryExtraction(prevCount);
+
     this.abortController = null;
+  }
+
+  // scheduleMemoryExtraction —— 自然结束后异步提炼记忆
+  private scheduleMemoryExtraction(prevCount: number): void {
+    const projectRoot = process.cwd();
+    // 读取已有索引
+    let existingIndex: MemoryIndexBundle;
+    try {
+      existingIndex = loadIndexes(projectRoot);
+    } catch {
+      existingIndex = { project: [], user: [] };
+    }
+
+    // 异步提炼，不阻塞主路径
+    extractFromTurn(
+      {
+        sessionId: basename(this.historyPath, ".jsonl"),
+        turnRange: { start: prevCount, end: this.messages.length },
+        projectRoot,
+        existingMemoryIndex: existingIndex,
+        triggeredAt: new Date().toISOString(),
+      },
+      this.messages,
+    ).catch((e) => {
+      // 记忆提炼失败只记日志，不阻塞
+      console.warn("[MemoryExtractor] 提炼失败：", (e as Error).message);
+    });
   }
 
   cancel(): void {
