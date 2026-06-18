@@ -20,6 +20,15 @@ export interface ResolvedInstructionDocument {
   warnings: string[];
 }
 
+import type { BootstrapDiagnostic } from "../bootstrap/types.js";
+
+// InstructionLoadResult —— 指令加载返回
+export interface InstructionLoadResult {
+  text: string;
+  documents: ResolvedInstructionDocument[];
+  diagnostics: BootstrapDiagnostic[];
+}
+
 // InstructionResolveOptions —— 指令展开约束配置
 export interface InstructionResolveOptions {
   maxIncludeDepth: number;
