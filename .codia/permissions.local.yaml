@@ -1,0 +1,4 @@
+rules:
+  - "Write(hello.txt): allow"
+  - "Write(hi.txt): allow"
+  - "Write: allow"
