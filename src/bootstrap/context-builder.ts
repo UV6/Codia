@@ -8,6 +8,8 @@ import { loadForProject } from "../instruction/loader.js";
 import { loadIndexes, renderIndexText } from "../memory/store.js";
 import { recoverSession } from "../chat/recovery.js";
 import { sessionPath } from "../chat/history.js";
+import { scanAll } from "../skill/loader.js";
+import type { Skill, SkillDiagnostic } from "../skill/types.js";
 
 export interface BuildOptions {
   projectRoot: string;
@@ -48,11 +50,38 @@ export function buildNewSessionContext(options: BuildOptions): BootstrapContext 
     });
   }
 
+  // 扫描 Skill
+  let skills: Skill[] = [];
+  let skillDiagnostics: SkillDiagnostic[] = [];
+  try {
+    const result = scanAll(options.projectRoot);
+    skills = result.skills;
+    skillDiagnostics = result.diagnostics;
+  } catch (e) {
+    diag.entries.push({
+      source: "skill",
+      level: "warning",
+      message: `Skill 扫描失败：${(e as Error).message}`,
+      code: "SKILL_SCAN_ERROR",
+    });
+  }
+
+  // 合并 Skill 诊断
+  for (const sd of skillDiagnostics) {
+    diag.entries.push({
+      source: "skill",
+      level: sd.level,
+      message: sd.message,
+      code: sd.level === "error" ? "SKILL_ALLOWED_TOOL_INVALID" : "SKILL_PARSE_WARNING",
+    });
+  }
+
   return {
     instructionText,
     memoryText,
     recoveredMessages: [],
     diagnostics: diag,
+    skillScanData: { skills, diagnostics: skillDiagnostics },
   };
 }
 

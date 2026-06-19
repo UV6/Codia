@@ -1,7 +1,8 @@
 import type { Message } from "../provider/types.js";
+import type { Skill, SkillDiagnostic } from "../skill/types.js";
 
 // BootstrapDiagnosticSource —— 启动恢复诊断来源
-export type BootstrapDiagnosticSource = "instruction" | "session" | "memory" | "bootstrap";
+export type BootstrapDiagnosticSource = "instruction" | "session" | "memory" | "bootstrap" | "skill";
 
 // BootstrapDiagnosticLevel —— 启动恢复诊断级别
 export type BootstrapDiagnosticLevel = "info" | "warning" | "error";
@@ -42,6 +43,12 @@ export interface SessionRecoveryResult {
   lastActivityAt?: string;
 }
 
+// SkillScanData —— Skill 扫描结果
+export interface SkillScanData {
+  skills: Skill[];
+  diagnostics: SkillDiagnostic[];
+}
+
 // BootstrapContext —— 启动恢复编排器输出给 ChatService 的上下文
 export interface BootstrapContext {
   instructionText: string;
@@ -49,4 +56,5 @@ export interface BootstrapContext {
   recoveredMessages: Message[];
   diagnostics: BootstrapDiagnostics;
   sessionSummary?: SessionSummary;
+  skillScanData: SkillScanData;
 }

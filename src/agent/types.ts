@@ -18,6 +18,7 @@ export interface AgentLoopConfig {
   planFilePath?: string;    // plan mode 下的计划输出文件
   permissionMode?: PermissionMode;     // 权限模式，默认 "default"
   humanInTheLoop?: HumanInTheLoopCallback;  // 人在回路回调
+  allowedTools?: string[];  // Skill 白名单过滤，存在时仅允许列表中的工具
 }
 
 // AgentEvent —— Agent Loop 向外推送的事件类型

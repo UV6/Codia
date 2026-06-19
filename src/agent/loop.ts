@@ -47,9 +47,10 @@ export class AgentLoop {
     while (round < maxRounds) {
       yield { type: "round_start", round };
 
-      // 1. 根据模式选择工具列表
-      const toolMetas =
-        config.mode === "plan"
+      // 1. 根据白名单/模式选择工具列表
+      const toolMetas = config.allowedTools
+        ? this.registry.getMetasWithFilter(config.allowedTools)
+        : config.mode === "plan"
           ? filterReadOnlyTools(allTools)
           : allToolMetas;
 

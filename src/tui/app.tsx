@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Box, Text } from "ink";
 import { useInput } from "ink";
 import { InputBox } from "./input-box.js";
@@ -8,6 +8,13 @@ import { StatusBar } from "./status-bar.js";
 import type { Message } from "../provider/types.js";
 import type { ChatService } from "../chat/chat-service.js";
 import type { HumanChoice, HumanPrompt } from "../permission/types.js";
+import { CommandRegistry } from "../command/registry.js";
+import { parseCommand } from "../command/parser.js";
+import { dispatch } from "../command/dispatcher.js";
+import { getBuiltinCommands } from "../command/builtin/index.js";
+import { setCommandProvider } from "../command/builtin/help.js";
+import { setSessionInfoProvider } from "../command/builtin/session.js";
+import type { UIContext } from "../command/types.js";
 
 interface AppProps {
   service: ChatService;
@@ -23,6 +30,7 @@ export function App({ service }: AppProps) {
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [mode, setModeState] = useState<"full" | "plan">(service.currentMode);
 
   // 权限确认状态
   const [permissionPrompt, setPermissionPrompt] = useState<HumanPrompt | null>(null);
@@ -37,57 +45,33 @@ export function App({ service }: AppProps) {
     });
   }, []);
 
-  // MCP 初始化（仅首次挂载时执行）
-  useEffect(() => {
-    service.init();
+  // 命令注册中心（仅首次）
+  const registry = useMemo(() => {
+    const reg = new CommandRegistry();
+    const skillSummaries = service.getSkillRegistry().getSummaries();
+    const commands = getBuiltinCommands(skillSummaries);
+    for (const cmd of commands) {
+      reg.register(cmd);
+    }
+    // 注入命令列表供 /help 使用
+    setCommandProvider(() => reg.getAll());
+    return reg;
   }, [service]);
 
-  // 注入回调到 ChatService
+  // 注入会话信息供 /session 使用
   useEffect(() => {
-    service.setHumanInTheLoop(humanInTheLoop);
-  }, [service, humanInTheLoop]);
+    setSessionInfoProvider(() => {
+      const lines: string[] = [
+        `会话文件: ${service.sessionPath}`,
+        `消息数: ${service.history.length}`,
+        `模式: ${mode === "plan" ? "PLAN" : "DEFAULT"}`,
+      ];
+      return lines.join("\n");
+    });
+  }, [service, mode]);
 
-  // 订阅用量回调
-  useEffect(() => {
-    service.onUsage = (u) => setUsage(u);
-  }, [service]);
-
-  // 权限确认按键处理（只在权限弹窗激活时）
-  useInput((input, key) => {
-    if (!permissionPrompt) return;
-
-    const resolve = permissionResolveRef.current;
-    if (!resolve) return;
-
-    const ch = input.toLowerCase();
-    if (ch === "y") {
-      permissionResolveRef.current = null;
-      setPermissionPrompt(null);
-      resolve("yes");
-    } else if (ch === "n") {
-      permissionResolveRef.current = null;
-      setPermissionPrompt(null);
-      resolve("no");
-    } else if (ch === "a") {
-      permissionResolveRef.current = null;
-      setPermissionPrompt(null);
-      resolve("always_allow");
-    }
-  });
-
-  // Ctrl+C / Ctrl+T
-  useInput((input, key) => {
-    if (permissionPrompt) return; // 权限弹窗激活时不响应其他按键
-    if (key.ctrl && input === "c" && isStreaming) {
-      service.cancel();
-    }
-    if (key.ctrl && input === "t") {
-      setThinkingCollapsed((prev) => !prev);
-    }
-  });
-
-  // 提交消息
-  const handleSubmit = async (text: string) => {
+  // AI 对话提交（不经命令分流，供 prompt 型命令和普通对话使用）
+  const handleAISubmit = useCallback(async (text: string) => {
     if (!text.trim()) return;
 
     setError(null);
@@ -146,7 +130,128 @@ export function App({ service }: AppProps) {
     } finally {
       setIsStreaming(false);
     }
-  };
+  }, [service]);
+
+  // UIContext 实例 — 桥接命令系统与 App state / ChatService
+  const uiContext: UIContext = useMemo(() => ({
+    showMessage(text: string, type: "info" | "warning" | "error"): void {
+      const rolePrefix = type === "error" ? "✗" : type === "warning" ? "⚠" : "ℹ";
+      const sysMsg: Message = {
+        role: "user",
+        content: `${rolePrefix} ${text}`,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, sysMsg]);
+    },
+
+    sendUserMessage(text: string): void {
+      // 直接走 AI 路径，绕过命令分流器
+      handleAISubmit(text);
+    },
+
+    clearMessages(): void {
+      service.getSkillRegistry().clear();
+      setMessages([]);
+    },
+
+    setMode(newMode: "full" | "plan"): void {
+      service.setMode(newMode);
+      setModeState(newMode);
+    },
+
+    getMode(): "full" | "plan" {
+      return mode;
+    },
+
+    getTokenUsage() {
+      return usage;
+    },
+
+    triggerCompact(): void {
+      service.compact();
+    },
+
+    refreshStatus(): void {
+      // 强制触发状态栏刷新（通过更新 mode state 的引用）
+      setModeState((prev) => prev);
+    },
+  }), [service, handleAISubmit, mode, usage]);
+
+  // MCP 初始化（仅首次挂载时执行）
+  useEffect(() => {
+    service.init();
+  }, [service]);
+
+  // 注入回调到 ChatService
+  useEffect(() => {
+    service.setHumanInTheLoop(humanInTheLoop);
+  }, [service, humanInTheLoop]);
+
+  // 订阅用量回调
+  useEffect(() => {
+    service.onUsage = (u) => setUsage(u);
+  }, [service]);
+
+  // 权限确认按键处理（只在权限弹窗激活时）
+  useInput((input, key) => {
+    if (!permissionPrompt) return;
+
+    const resolve = permissionResolveRef.current;
+    if (!resolve) return;
+
+    const ch = input.toLowerCase();
+    if (ch === "y") {
+      permissionResolveRef.current = null;
+      setPermissionPrompt(null);
+      resolve("yes");
+    } else if (ch === "n") {
+      permissionResolveRef.current = null;
+      setPermissionPrompt(null);
+      resolve("no");
+    } else if (ch === "a") {
+      permissionResolveRef.current = null;
+      setPermissionPrompt(null);
+      resolve("always_allow");
+    }
+  });
+
+  // Ctrl+C / Ctrl+T
+  useInput((input, key) => {
+    if (permissionPrompt) return; // 权限弹窗激活时不响应其他按键
+    if (key.ctrl && input === "c" && isStreaming) {
+      service.cancel();
+    }
+    if (key.ctrl && input === "t") {
+      setThinkingCollapsed((prev) => !prev);
+    }
+  });
+
+  // 提交消息 — 分流器入口
+  const handleSubmit = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+
+    // 命令分流
+    if (text.startsWith("/")) {
+      const parsed = parseCommand(text);
+
+      if (parsed.isCommand) {
+        const cmd = registry.get(parsed.name);
+        if (cmd) {
+          dispatch(cmd, parsed.args, uiContext);
+          return;
+        } else {
+          uiContext.showMessage(
+            `未知命令: /${parsed.name}。输入 /help 查看可用命令。`,
+            "warning",
+          );
+          return;
+        }
+      }
+    }
+
+    // 非命令 → AI 对话
+    await handleAISubmit(text);
+  }, [registry, uiContext, handleAISubmit]);
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -187,9 +292,15 @@ export function App({ service }: AppProps) {
         model={service["config"]?.["model"] ?? "unknown"}
         usage={usage ?? undefined}
         streaming={isStreaming}
+        mode={mode}
       />
 
-      <InputBox onSubmit={handleSubmit} disabled={isStreaming || !!permissionPrompt} error={error ?? undefined} />
+      <InputBox
+        onSubmit={handleSubmit}
+        disabled={isStreaming || !!permissionPrompt}
+        error={error ?? undefined}
+        registry={registry}
+      />
     </Box>
   );
 }

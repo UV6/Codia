@@ -8,13 +8,9 @@ import { editFileTool } from "../tool/tools/edit-file.js";
 import { globTool } from "../tool/tools/glob.js";
 import { grepTool } from "../tool/tools/grep.js";
 import { runCommandTool } from "../tool/tools/run-command.js";
+import { createLoadSkillTool } from "../tool/tools/load-skill.js";
 import { AgentLoop, DEFAULT_MAX_ROUNDS } from "../agent/loop.js";
-import {
-  isPlanCommand,
-  isDoCommand,
-  extractPlanMessage,
-  PLAN_MODE_PROMPT,
-} from "../agent/plan-mode.js";
+import { PLAN_MODE_PROMPT } from "../agent/plan-mode.js";
 import type { AgentEvent, AgentLoopConfig } from "../agent/types.js";
 import { ContextManager } from "../context/manager.js";
 import { SystemPromptBuilder } from "../prompt/builder.js";
@@ -42,9 +38,13 @@ import type { BootstrapContext } from "../bootstrap/types.js";
 import { extractFromTurn } from "../memory/extractor.js";
 import type { MemoryIndexBundle } from "../memory/types.js";
 import { loadIndexes } from "../memory/store.js";
+import { SkillRegistry } from "../skill/registry.js";
+import { SkillActivator } from "../skill/activator.js";
+import { toSummaries } from "../skill/loader.js";
+import type { Skill, SkillDiagnostic } from "../skill/types.js";
 
 // ChatService —— 对话核心
-// 负责消息历史管理、会话持久化、命令解析，循环逻辑委托给 AgentLoop
+// 负责消息历史管理、会话持久化、模式与权限控制，循环逻辑委托给 AgentLoop
 export class ChatService {
   private provider;
   private config: ChatConfig;
@@ -68,6 +68,11 @@ export class ChatService {
 
   // 上下文压缩管理器
   private contextManager: ContextManager;
+
+  // Skill 系统
+  private skillRegistry: SkillRegistry;
+  private skillActivator: SkillActivator;
+  private skillSummariesText: string;
 
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
@@ -129,6 +134,32 @@ export class ChatService {
     this.permissionMode = options.permissionMode ?? "default";
     this.humanInTheLoop = options.humanInTheLoop;
 
+    // 初始化 Skill 系统
+    this.skillRegistry = new SkillRegistry();
+    const { skills, diagnostics: skillDiags } = bootstrapContext.skillScanData;
+    this.skillRegistry.setSummaries(toSummaries(skills));
+    this.skillRegistry.setFullSkills(skills);
+
+    // 合并 Skill 诊断
+    for (const sd of skillDiags) {
+      bootstrapContext.diagnostics.entries.push({
+        source: "skill",
+        level: sd.level,
+        message: sd.message,
+        code: sd.level === "error" ? "SKILL_ALLOWED_TOOL_INVALID" : "SKILL_PARSE_WARNING",
+      });
+    }
+
+    this.skillActivator = new SkillActivator(this.skillRegistry, options.projectRoot ?? process.cwd());
+
+    // 生成 Skill 摘要文本
+    const summaryLines = skills.map(
+      (s) => `- **/${s.frontmatter.name}**${s.frontmatter.aliases ? ` (/${s.frontmatter.aliases.join(", /")})` : ""}: ${s.frontmatter.description}`,
+    );
+    this.skillSummariesText = summaryLines.length > 0
+      ? `## 可用 Skill\n\n${summaryLines.join("\n")}\n\n使用 /skill-name 或调用 LoadSkill 工具加载 Skill 获取详细指令。`
+      : "";
+
     // 注册六个核心工具
     this.registry = new ToolRegistry();
     this.registry.register(readFileTool);
@@ -137,6 +168,21 @@ export class ChatService {
     this.registry.register(globTool);
     this.registry.register(grepTool);
     this.registry.register(runCommandTool);
+
+    // 注册 LoadSkill 系统工具（注入 activator）
+    this.registry.register(createLoadSkillTool(this.skillActivator));
+
+    // 启动时校验 Skill 白名单（仅内置工具）
+    const builtinToolNames = new Set(this.registry.getToolNames());
+    const validationDiags = this.skillRegistry.validateAllowedTools(builtinToolNames);
+    for (const vd of validationDiags) {
+      bootstrapContext.diagnostics.entries.push({
+        source: "skill",
+        level: vd.level === "error" ? "error" : "warning",
+        message: vd.message,
+        code: "SKILL_ALLOWED_TOOL_INVALID",
+      });
+    }
 
     // 提取会话 ID（不含扩展名的文件名）
     const sessionId = basename(this.historyPath, ".jsonl");
@@ -150,8 +196,12 @@ export class ChatService {
 
     this.agentLoop = new AgentLoop(this.registry, this.contextManager);
 
-    // 构建完整 System Prompt：项目指令 + 记忆索引 + 七个固定模块 + 环境信息
+    // 构建完整 System Prompt：Skill 摘要 + 项目指令 + 记忆索引 + 七个固定模块 + 环境信息
     const builder = new SystemPromptBuilder();
+    // 注入 Skill 摘要（阶段一）
+    if (this.skillSummariesText) {
+      builder.add({ name: "skill-summaries", priority: 5, content: this.skillSummariesText });
+    }
     // 注入恢复后的项目指令与记忆索引
     if (bootstrapContext.instructionText) {
       builder.add(instructionSection(bootstrapContext.instructionText));
@@ -169,6 +219,11 @@ export class ChatService {
     const basePrompt = builder.build();
     const envInfo = this.buildEnvInfo();
     this.fullSystemPrompt = envInfo ? `${basePrompt}\n\n${envInfo}` : basePrompt;
+  }
+
+  // getSkillRegistry —— 公开 SkillRegistry 供 TUI 使用
+  getSkillRegistry(): SkillRegistry {
+    return this.skillRegistry;
   }
 
   // init —— 异步初始化：加载 MCP 配置并连接外部 Server
@@ -206,51 +261,43 @@ export class ChatService {
     return this.mode;
   }
 
+  // 当前权限模式
+  get currentPermissionMode(): PermissionMode {
+    return this.permissionMode;
+  }
+
   // 设置人在回路回调（由 TUI 注入）
   setHumanInTheLoop(callback: HumanInTheLoopCallback): void {
     this.humanInTheLoop = callback;
+  }
+
+  // setMode —— 切换模式（供 UIContext 调用）
+  setMode(mode: "full" | "plan"): void {
+    this.mode = mode;
+    if (mode === "plan") {
+      this.permissionMode = "plan";
+    } else {
+      this.permissionMode = "default";
+    }
+  }
+
+  // compact —— 手动触发上下文压缩（供 /compact 命令调用）
+  compact(): void {
+    const signal = new AbortController().signal;
+    this.contextManager.preRequest(this.messages, "manual", signal).then((result) => {
+      if (result.events.length > 0) {
+        // 压缩发生：替换消息历史
+        this.messages = result.messages;
+      }
+    }).catch((e) => {
+      console.warn("[ChatService] compact 失败：", (e as Error).message);
+    });
   }
 
   async *sendMessage(text: string): AsyncIterable<AgentEvent> {
     this.cancel();
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
-
-    // 解析命令
-    if (isCompressCommand(text)) {
-      // /compress —— 手动触发上下文压缩
-      const result = await this.contextManager.preRequest(this.messages, "manual", signal);
-      if (result.events.length > 0) {
-        for (const e of result.events) {
-          yield e;
-        }
-      }
-      // 用压缩后的消息替换当前历史
-      this.messages = result.messages;
-      return;
-    } else if (isPermissionDefaultCommand(text)) {
-      this.permissionMode = "default";
-      yield { type: "tool_status", name: "mode", param: "default" };
-      return;
-    } else if (isPermissionAcceptsEditCommand(text)) {
-      this.permissionMode = "acceptsEdit";
-      yield { type: "tool_status", name: "mode", param: "acceptsEdit" };
-      return;
-    } else if (isPlanCommand(text)) {
-      // /plan 同时设置 agent plan mode 和 permission plan mode
-      this.mode = "plan";
-      this.permissionMode = "plan";
-      const planMessage = extractPlanMessage(text) || "请分析需求并写入执行计划";
-      text = planMessage;
-    } else if (isDoCommand(text)) {
-      if (this.mode === "plan") {
-        this.mode = "full";
-        // 退出 plan mode 时恢复 permission mode 为 default
-        this.permissionMode = "default";
-        return;
-      }
-      return;
-    }
 
     // 用户消息（干净，不含环境信息）
     const userMsg: Message = {
@@ -264,12 +311,24 @@ export class ChatService {
     // 记录循环前的消息数量，用于后续持久化
     const prevCount = this.messages.length;
 
+    // 构建 System Prompt（含已激活 Skill 正文）
+    const activeBodies = this.skillRegistry.getActiveSkillBodies();
+    const skillPrefix = activeBodies.length > 0
+      ? activeBodies.join("\n\n---\n\n") + "\n\n---\n\n"
+      : "";
+    const fullSystem = skillPrefix + this.fullSystemPrompt;
+
+    // 获取当前工具白名单
+    const allToolNames = this.registry.getToolNames();
+    const allowedTools = this.skillRegistry.getEffectiveAllowedTools(allToolNames);
+
     // 构建 AgentLoop 配置
     const agentConfig: AgentLoopConfig = {
       maxRounds: this.maxRounds,
       mode: this.mode,
       permissionMode: this.permissionMode,
       humanInTheLoop: this.humanInTheLoop,
+      allowedTools,
     };
 
     // 构建 PermissionChecker（如有 humanInTheLoop 回调或使用默认）
@@ -286,10 +345,10 @@ export class ChatService {
     const humanCallback = this.humanInTheLoop ?? (async () => "yes" as const);
     const permissionChecker = new PermissionChecker(ruleEngine, this.permissionMode, humanCallback);
 
-    // 本轮 system prompt（完整 prompt + 可选的 plan mode 后缀）
+    // 本轮 system prompt（激活 Skill 正文 + 基础 prompt + 可选的 plan mode 后缀）
     const systemPrompt = this.mode === "plan"
-      ? this.fullSystemPrompt + "\n\n" + PLAN_MODE_PROMPT + "plan.md"
-      : this.fullSystemPrompt;
+      ? fullSystem + "\n\n" + PLAN_MODE_PROMPT + "plan.md"
+      : fullSystem;
 
     // 启动 AgentLoop
     for await (const event of this.agentLoop.run(
@@ -379,19 +438,4 @@ export class ChatService {
 
     return info.join("\n");
   }
-}
-
-// isPermissionDefaultCommand —— 匹配 /default
-function isPermissionDefaultCommand(text: string): boolean {
-  return /^\/default\s*$/.test(text.trim());
-}
-
-// isCompressCommand —— 匹配 /compress
-function isCompressCommand(text: string): boolean {
-  return /^\/compress\s*$/.test(text.trim());
-}
-
-// isPermissionAcceptsEditCommand —— 匹配 /acceptsEdit
-function isPermissionAcceptsEditCommand(text: string): boolean {
-  return /^\/acceptsEdit\s*$/.test(text.trim());
 }

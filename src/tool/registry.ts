@@ -22,6 +22,11 @@ export class ToolRegistry {
     return this.tools.get(name)?.type;
   }
 
+  // 获取所有工具名
+  getToolNames(): string[] {
+    return Array.from(this.tools.keys());
+  }
+
   // 获取所有工具的 ToolMeta 数组（直接传给 Anthropic API 的 tools 字段）
   getAllMetas(): ToolMeta[] {
     return Array.from(this.tools.values()).map((t) => ({
@@ -29,6 +34,15 @@ export class ToolRegistry {
       description: t.description,
       input_schema: t.inputSchema,
     }));
+  }
+
+  // getAllMetasWithFilter —— 按白名单过滤 ToolMeta
+  // allowedNames 存在时只返回白名单内工具的 metas，否则返回全部
+  getMetasWithFilter(allowedNames?: string[]): ToolMeta[] {
+    const metas = this.getAllMetas();
+    if (!allowedNames || allowedNames.length === 0) return metas;
+    const filterSet = new Set(allowedNames);
+    return metas.filter((m) => filterSet.has(m.name));
   }
 
   // 返回所有 Tool 实例
