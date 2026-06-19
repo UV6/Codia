@@ -1,7 +1,10 @@
-import type { Chunk } from "../provider/types.js";
+import type { Chunk, Message, LLMProvider, ChatConfig } from "../provider/types.js";
 import type { ToolCall, ToolResult } from "../tool/types.js";
+import type { ToolRegistry } from "../tool/registry.js";
 import type { PermissionMode, HumanInTheLoopCallback } from "../permission/types.js";
 import type { CompressEvent } from "../context/types.js";
+import type { HookEngine } from "../hook/engine.js";
+import type { AgentRole } from "./role/types.js";
 
 // StopReason —— 循环停止原因
 export type StopReason =
@@ -45,4 +48,47 @@ export interface ScheduleResult {
   callId: string;
   name: string;
   result: ToolResult;
+}
+
+// 以下为子 Agent 系统类型
+
+// SubAgentConfig —— 子 Agent 运行器的输入配置
+export interface SubAgentConfig {
+  type: "definition" | "fork";
+  role?: AgentRole; // 定义式必填
+  prompt: string; // 任务描述
+  description: string; // 简短描述，用于进度展示
+  name?: string; // 显示名称
+  model?: string; // 模型覆盖
+  runInBackground: boolean; // 是否后台运行（Fork 强制 true）
+  parentMessages: Message[]; // 父对话消息（Fork 式继承用）
+  parentProvider: LLMProvider;
+  parentChatConfig: ChatConfig;
+  parentRegistry: ToolRegistry;
+  parentHookEngine?: HookEngine;
+  cwd: string; // 工作目录
+  signal: AbortSignal; // 取消信号
+}
+
+// SubAgentResult —— 子 Agent 运行完成后的返回结果
+export interface SubAgentResult {
+  status: "completed" | "failed" | "max_rounds" | "cancelled";
+  text: string; // 子 Agent 的最终文本输出
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    model: string;
+  };
+  rounds: number; // 实际执行的轮次数
+  toolCalls: number; // 实际执行了多少次工具调用
+}
+
+// BackgroundTask —— 后台任务管理器中的单条追踪记录
+export interface BackgroundTask {
+  id: string; // 唯一标识
+  status: "running" | "completed" | "failed";
+  type: string; // 角色名或 "fork"
+  description: string; // 创建时的描述
+  startTime: string; // ISO 8601
+  result?: SubAgentResult; // 完成时填充
 }
