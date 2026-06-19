@@ -4,3 +4,13 @@ dist/
 *.log
 .env
 codia.yaml
+.DS_Store
+sessions/
+.codegraph/codegraph.db
+.codegraph/codegraph.db-shm
+.codegraph/codegraph.db-wal
+.codegraph/daemon.log
+.codegraph/daemon.pid
+.codegraph/daemon.sock
+.claude/worktrees/
+.claude/settings.local.json
