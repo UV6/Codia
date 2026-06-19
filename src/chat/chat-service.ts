@@ -42,6 +42,8 @@ import { SkillRegistry } from "../skill/registry.js";
 import { SkillActivator } from "../skill/activator.js";
 import { toSummaries } from "../skill/loader.js";
 import type { Skill, SkillDiagnostic } from "../skill/types.js";
+import { HookEngine } from "../hook/engine.js";
+import { loadAllHooks } from "../hook/loader.js";
 
 // ChatService —— 对话核心
 // 负责消息历史管理、会话持久化、模式与权限控制，循环逻辑委托给 AgentLoop
@@ -68,6 +70,9 @@ export class ChatService {
 
   // 上下文压缩管理器
   private contextManager: ContextManager;
+
+  // Hook 系统
+  private hookEngine: HookEngine;
 
   // Skill 系统
   private skillRegistry: SkillRegistry;
@@ -194,7 +199,17 @@ export class ChatService {
       sessionId,
     );
 
-    this.agentLoop = new AgentLoop(this.registry, this.contextManager);
+    // 初始化 Hook 系统
+    const projectRoot = options.projectRoot ?? process.cwd();
+    this.hookEngine = new HookEngine(
+      loadAllHooks(
+        join(homedir(), ".codia", "hooks.yaml"),
+        join(projectRoot, ".codia", "hooks.yaml"),
+        join(projectRoot, ".codia", "hooks.local.yaml"),
+      ),
+    );
+
+    this.agentLoop = new AgentLoop(this.registry, this.contextManager, this.hookEngine);
 
     // 构建完整 System Prompt：Skill 摘要 + 项目指令 + 记忆索引 + 七个固定模块 + 环境信息
     const builder = new SystemPromptBuilder();
@@ -219,6 +234,14 @@ export class ChatService {
     const basePrompt = builder.build();
     const envInfo = this.buildEnvInfo();
     this.fullSystemPrompt = envInfo ? `${basePrompt}\n\n${envInfo}` : basePrompt;
+
+    // 触发 session_start Hook（异步，不阻塞构造）
+    this.hookEngine.fire("session_start", {
+      session_id: sessionId,
+      cwd: projectRoot,
+    }).catch(() => {
+      // Hook 失败不影响会话
+    });
   }
 
   // getSkillRegistry —— 公开 SkillRegistry 供 TUI 使用
@@ -226,8 +249,29 @@ export class ChatService {
     return this.skillRegistry;
   }
 
-  // init —— 异步初始化：加载 MCP 配置并连接外部 Server
+  // init —— 异步初始化：加载 MCP 配置，连接外部 Server，触发 startup Hook
   async init(): Promise<void> {
+    // 触发 startup Hook
+    try {
+      await this.hookEngine.fire("startup", {
+        pid: process.pid,
+        cwd: process.cwd(),
+        version: this.config.model ?? "unknown",
+      });
+    } catch {
+      // Hook 失败不影响
+    }
+
+    // 注册 shutdown Hook
+    process.on("beforeExit", () => {
+      this.hookEngine.fire("shutdown", {
+        pid: process.pid,
+        uptime: process.uptime(),
+      }).catch(() => {
+        // Hook 失败不影响
+      });
+    });
+
     try {
       const mcpConfig = loadMcpConfig();
       const serverCount = Object.keys(mcpConfig.servers).length;
@@ -242,6 +286,16 @@ export class ChatService {
 
   // disconnect —— 断开 MCP 连接并释放资源
   async disconnect(): Promise<void> {
+    // 触发 session_end Hook
+    try {
+      await this.hookEngine.fire("session_end", {
+        session_id: basename(this.historyPath, ".jsonl"),
+        message_count: this.messages.length,
+      });
+    } catch {
+      // Hook 失败不影响
+    }
+
     if (this.mcpManager) {
       await this.mcpManager.disconnectAll();
     }

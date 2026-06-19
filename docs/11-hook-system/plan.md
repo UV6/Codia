@@ -153,7 +153,29 @@ export type ResolvedControl = Required<HookControl>;
 export type HookContext = Record<string, unknown>;
 ```
 
-各事件的具体上下文字段参见 spec F2 表格。
+各事件上下文字段参考（统一使用 snake_case，此表为权威定义，覆盖 spec、plan、task 所有引用）：
+
+| 事件 | 上下文字段 | 类型 | 提供方 |
+|------|-----------|------|--------|
+| `startup` | `pid`, `cwd`, `version` | `number`, `string`, `string` | Bootstrap |
+| `shutdown` | `pid`, `uptime` | `number`, `number` | Bootstrap |
+| `session_start` | `session_id`, `cwd` | `string`, `string` | ChatService |
+| `session_end` | `session_id`, `message_count` | `string`, `number` | ChatService |
+| `turn_start` | `round`, `cwd`, `message_count` | `number`, `string`, `number` | AgentLoop |
+| `turn_end` | `round`, `stop_reason` | `number`, `string` | AgentLoop |
+| `pre_llm` | `message_count`, `system_prompt` | `number`, `string?` | AgentLoop |
+| `post_llm` | `response`, `usage` | `string`, `object?` | AgentLoop |
+| `pre_tool` | `tool_name`, `params`, `cwd` | `string`, `object`, `string` | ToolScheduler |
+| `post_tool` | `tool_name`, `params`, `result`, `duration`, `cwd` | `string`, `object`, `object`, `number`, `string` | ToolScheduler |
+
+### HookFireOptions
+
+```typescript
+// fire() 的额外选项
+export interface HookFireOptions {
+  onPrompt?: (text: string) => void; // prompt 动作文本的回调
+}
+```
 
 ### HookFireResult
 
@@ -205,7 +227,7 @@ function validateRule(rule: unknown, source: string): string[];
 
 **校验规则：**
 - `event` 必填且在已知事件列表中
-- `if` 可选，存在时 `match` 必须是 `all` 或 `any`，`fields` 必须是非空数组
+- `if` 可选，存在时且非空时 `match` 必须是 `all` 或 `any`，`fields` 必须是非空数组；`if` 为 `{}` 或 `fields` 为空数组时视为无条件触发，从规则中移除 `condition` 字段
 - 每个 field 条件中 `field` 必填，且 `equals`/`not`/`regex`/`glob` 至少有一个
 - `action` 必填，`type` 必须是 `command`/`prompt`/`http`/`subagent` 之一
 - `action.type === "command"` 时 `command` 必填
@@ -240,7 +262,7 @@ function getFieldValue(context: HookContext, fieldPath: string): string | undefi
 ```
 
 **匹配逻辑：**
-1. `condition` 为 `undefined` → `true`（无条件触发）
+1. `condition` 为 `undefined` 或 `condition.fields` 为空 → `true`（无条件触发，`if: {}` 由 loader 归一化）
 2. 从 `context` 中取字段值，值为 `undefined` 时该字段条件视为不满足
 3. 对每个 `FieldCondition`，检查指定的匹配模式（`equals`/`not`/`regex`/`glob`）
 4. `regex` 匹配用 `new RegExp(pattern).test(value)`
@@ -298,7 +320,8 @@ export class HookEngine {
   constructor(rules: HookRule[]);
 
   // 触发普通事件 — 匹配规则，执行动作，不关心返回值
-  async fire(event: HookEvent, context: HookContext): Promise<void>;
+  // opts.onPrompt: prompt 动作文本的回调，调用方用于注入到上下文中
+  async fire(event: HookEvent, context: HookContext, opts?: HookFireOptions): Promise<void>;
 
   // 触发拦截事件 — 匹配规则，执行动作，检测 REJECT 信号
   async fireIntercept(
@@ -325,6 +348,8 @@ export class HookEngine {
    e. 匹配 + 非 background → await executeAction()
 3. 忽略所有错误
 ```
+
+> **prompt 动作说明：** prompt 动作的文本通过 `opts.onPrompt` 回调传递给调用方。若调用方未提供此回调（或事件并非 `pre_llm` 等关心注入的事件），prompt 文本被静默丢弃。
 
 **fireIntercept() 流程：**
 ```

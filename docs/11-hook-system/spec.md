@@ -46,15 +46,15 @@ Hook 配置文件位置与现有权限规则一致，支持三层：
 
 | 事件 | 层级 | 触发时机 | 上下文数据 |
 |------|------|---------|-----------|
-| `startup` | 系统 | 进程启动、配置加载完成后 | process |
-| `shutdown` | 系统 | 进程退出前 | process |
-| `session_start` | 会话 | 新会话创建时 | session id, cwd |
-| `session_end` | 会话 | 会话结束时 | session id, 消息数 |
-| `turn_start` | 轮次 | 每轮 Agent 迭代开始 | round, messages |
+| `startup` | 系统 | 进程启动、配置加载完成后 | pid, cwd, version |
+| `shutdown` | 系统 | 进程退出前 | pid, uptime |
+| `session_start` | 会话 | 新会话创建时 | session_id, cwd |
+| `session_end` | 会话 | 会话结束时 | session_id, message_count |
+| `turn_start` | 轮次 | 每轮 Agent 迭代开始 | round, cwd, message_count |
 | `turn_end` | 轮次 | 每轮 Agent 迭代结束 | round, stop_reason |
-| `pre_llm` | 消息 | 消息即将发送给模型 | messages, system_prompt |
+| `pre_llm` | 消息 | 消息即将发送给模型 | message_count, system_prompt |
 | `post_llm` | 消息 | 模型返回完整响应后 | response, usage |
-| `post_tool` | 工具 | 工具执行完成后 | tool_name, params, result, duration |
+| `post_tool` | 工具 | 工具执行完成后 | tool_name, params, result, duration, cwd |
 
 **拦截事件**（动作返回值可阻止后续执行）：
 
@@ -118,7 +118,7 @@ action:
 ```
 
 - `text` 字段同样支持 `{{字段名}}` 替换
-- 注入时机取决于绑定的事件：`pre_llm` 时注入到系统提示词末尾，`pre_tool` 时注入到工具参数说明中
+- 注入时机：绑定 `pre_llm` 事件时注入到系统提示词末尾；绑定其他事件时 prompt 文本被丢弃（prompt 动作仅对 `pre_llm` 有意义）
 - 注入的提示词追加到发送给模型的消息内容中
 
 ### F6: HTTP 请求动作

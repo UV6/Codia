@@ -5,6 +5,7 @@ import { StreamCollector } from "./stream-collector.js";
 import { ToolScheduler } from "./tool-scheduler.js";
 import { filterReadOnlyTools } from "./plan-mode.js";
 import type { PermissionChecker } from "../permission/checker.js";
+import type { HookEngine } from "../hook/engine.js";
 import type { ContextManager } from "../context/manager.js";
 import type { CompressEvent } from "../context/types.js";
 import type {
@@ -22,10 +23,16 @@ export const DEFAULT_MAX_ROUNDS = 20;
 export class AgentLoop {
   private registry: ToolRegistry;
   private contextManager?: ContextManager;
+  private hookEngine?: HookEngine;
 
-  constructor(registry: ToolRegistry, contextManager?: ContextManager) {
+  constructor(
+    registry: ToolRegistry,
+    contextManager?: ContextManager,
+    hookEngine?: HookEngine,
+  ) {
     this.registry = registry;
     this.contextManager = contextManager;
+    this.hookEngine = hookEngine;
   }
 
   async *run(
@@ -46,6 +53,19 @@ export class AgentLoop {
 
     while (round < maxRounds) {
       yield { type: "round_start", round };
+
+      // turn_start Hook
+      if (this.hookEngine) {
+        try {
+          await this.hookEngine.fire("turn_start", {
+            round,
+            cwd,
+            message_count: messages.length,
+          });
+        } catch {
+          // Hook 异常不影响主流程
+        }
+      }
 
       // 1. 根据白名单/模式选择工具列表
       const toolMetas = config.allowedTools
@@ -68,13 +88,33 @@ export class AgentLoop {
         }
       }
 
+      // pre_llm Hook（prompt 动作可注入到 system_prompt）
+      let effectiveSystemPrompt = systemPrompt;
+      if (this.hookEngine) {
+        try {
+          await this.hookEngine.fire(
+            "pre_llm",
+            { message_count: messages.length, system_prompt: systemPrompt },
+            {
+              onPrompt: (text: string) => {
+                effectiveSystemPrompt = effectiveSystemPrompt
+                  ? `${effectiveSystemPrompt}\n\n${text}`
+                  : text;
+              },
+            },
+          );
+        } catch {
+          // Hook 异常不影响主流程
+        }
+      }
+
       // 2. 调用 LLM 流（messages 已由 ChatService 组装好，含 reminders）
       const stream = provider.streamChat(
         messages,
         chatConfig,
         signal,
         toolMetas as unknown as Record<string, unknown>[],
-        systemPrompt,
+        effectiveSystemPrompt,
       );
 
       const collector = new StreamCollector(stream);
@@ -86,14 +126,28 @@ export class AgentLoop {
 
       // 检查取消
       if (signal.aborted) {
+        await this.fireTurnEnd(round, "cancelled");
         yield { type: "stopped", reason: "cancelled" as StopReason };
         break;
       }
 
       const result = collector.getResult();
 
+      // post_llm Hook
+      if (this.hookEngine) {
+        try {
+          await this.hookEngine.fire("post_llm", {
+            response: result.fullText,
+            usage: result.usage,
+          });
+        } catch {
+          // Hook 异常不影响主流程
+        }
+      }
+
       // 4. 判断停止条件
       if (result.hadError) {
+        await this.fireTurnEnd(round, "stream_error");
         yield { type: "stopped", reason: "stream_error" };
         break;
       }
@@ -113,6 +167,7 @@ export class AgentLoop {
         if (result.usage && this.contextManager) {
           this.contextManager.setAnchor(result.usage, messages.length);
         }
+        await this.fireTurnEnd(round, "done");
         yield { type: "stopped", reason: "done" };
         break;
       }
@@ -133,7 +188,7 @@ export class AgentLoop {
       }
 
       // 6. 调度并执行工具
-      const scheduler = new ToolScheduler(this.registry);
+      const scheduler = new ToolScheduler(this.registry, this.hookEngine);
       const context: ToolContext = { cwd, signal };
 
       let toolResults: ScheduleResult[];
@@ -145,6 +200,7 @@ export class AgentLoop {
         );
       } catch (e) {
         // 调度器自身异常（不应发生，但兜底）
+        await this.fireTurnEnd(round, "stream_error");
         yield { type: "stopped", reason: "stream_error" };
         break;
       }
@@ -164,6 +220,7 @@ export class AgentLoop {
         r.result.content.startsWith("未知工具："),
       ).length;
       if (unknownCount > 0 && unknownCount === toolResults.length) {
+        await this.fireTurnEnd(round, "unknown_tool");
         yield { type: "stopped", reason: "unknown_tool" };
         break;
       }
@@ -189,12 +246,33 @@ export class AgentLoop {
       }
 
       round++;
+
+      // turn_end Hook（正常继续下一轮）
+      if (this.hookEngine) {
+        try {
+          await this.hookEngine.fire("turn_end", { round, stop_reason: "in_progress" });
+        } catch {
+          // Hook 异常不影响主流程
+        }
+      }
+
       yield { type: "round_end", round };
     }
 
     // 达到迭代上限
     if (round >= maxRounds) {
+      await this.fireTurnEnd(round, "max_rounds");
       yield { type: "stopped", reason: "max_rounds" };
+    }
+  }
+
+  // fireTurnEnd —— 在轮次结束触发 turn_end Hook
+  private async fireTurnEnd(round: number, stopReason: string): Promise<void> {
+    if (!this.hookEngine) return;
+    try {
+      await this.hookEngine.fire("turn_end", { round, stop_reason: stopReason });
+    } catch {
+      // Hook 异常不影响主流程
     }
   }
 }
