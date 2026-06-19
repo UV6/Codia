@@ -12,15 +12,18 @@
 - [ ] `src/skill/builtin/review.md` 已创建，frontmatter 格式正确（验证：YAML frontmatter 可解析）
 - [ ] `src/skill/builtin/test.md` 已创建，frontmatter 格式正确（验证：YAML frontmatter 可解析）
 - [ ] `src/tool/tools/load-skill.ts` 已创建，LoadSkill 工具可注册到 ToolRegistry（验证：编译通过）
-- [ ] `src/bootstrap/types.ts` 已扩展 BootstrapContext（验证：`skillSummaries` 和 `activeSkillBodies` 字段存在）
+- [ ] `src/bootstrap/types.ts` 已扩展 BootstrapContext（验证：`skillScanData` 字段存在）
+- [ ] `src/skill/fork.ts` 已实现 Fork 模式执行（验证：编译通过）
+- [ ] `src/agent/types.ts` 和 `src/agent/loop.ts` 已扩展 allowedTools 支持（验证：编译通过）
 
 ## 集成
 
-- [ ] `src/chat/chat-service.ts` 在 system prompt 中注入 Skill 摘要和激活正文（验证：编译通过）
-- [ ] `src/bootstrap/context-builder.ts` 在 buildNewSessionContext 中扫描 Skill 并生成摘要（验证：编译通过）
-- [ ] `src/command/builtin/index.ts` 从 Skill 列表动态生成命令（验证：编译通过，无硬编码 reviewCommand）
+- [ ] `src/chat/chat-service.ts` 创建唯一 SkillRegistry，在 system prompt 中注入 Skill 摘要和激活正文（验证：编译通过）
+- [ ] `src/bootstrap/context-builder.ts` 在 buildNewSessionContext 中扫描 Skill 并将原始数据传入 BootstrapContext（验证：编译通过）
+- [ ] `src/command/builtin/index.ts` 从 Skill 列表动态生成命令及别名（验证：编译通过，无硬编码 reviewCommand）
 - [ ] `src/tool/registry.ts` 新增 getToolNames 和 getMetasWithFilter 方法（验证：编译通过）
 - [ ] `src/tui/app.tsx` 清空对话时调用 skillRegistry.clear()（验证：编译通过）
+- [ ] AgentLoop 在 full mode 时也应用 Skill 的 allowedTools 白名单（验证：编译通过）
 
 ## 编译与测试
 
@@ -40,5 +43,8 @@
 - [ ] 场景 6：优先级覆盖 — 同名 Skill 同时存在项目目录和用户目录，项目版本生效
 - [ ] 场景 7：错误文件不阻断 — 在 Skill 目录下放一个 frontmatter 格式错误的 `.md` 文件，其他 Skill 正常工作
 - [ ] 场景 8：清空对话清除 Skill — 激活一个 Skill 后 `/clear`，Skill 不再出现在上下文
-- [ ] 场景 9：意图识别 — 用户不输斜杠命令，而是说"帮我提交代码"，Agent 自动调用 LoadSkill 加载 commit Skill
+- [ ] 场景 9：意图识别 — 用户说"帮我提交代码"，Agent 自动调用 LoadSkill 加载 commit Skill（注：依赖模型行为，非确定性，建议多次测试确认成功率 > 70%）
 - [ ] 场景 10：多 Skill 同时激活 — 先激活 commit，再激活 test，两个 Skill 的正文均在上下文中
+- [ ] 场景 11：别名命令 — `/cr` 触发 review Skill，行为与 `/review` 一致
+- [ ] 场景 12：Fork 上下文隔离 — Fork 模式 review 执行完后，主对话中看不到 review 的逐轮交互过程，只看到摘要
+- [ ] 场景 13：allowedTools 生效 — 激活 allowedTools=["Bash"] 的 Skill 后，Agent 无法调用 Read/Write 等不在白名单中的工具

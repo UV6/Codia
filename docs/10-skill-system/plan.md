@@ -14,10 +14,13 @@ Skill 系统由 6 个模块组成，分层清晰：
 
 **`src/skill/builtin/`** — 内置 Skill 目录。存放 commit.md、review.md、test.md 三个样板 Skill。
 
+**生命周期：** SkillRegistry 在 ChatService 中作为唯一实例创建，通过 BootstrapContext 传递原始扫描数据（skills + diagnostics），ChatService 负责构造并持有 SkillRegistry。避免双实例不同步。
+
 **与现有系统集成点：**
-- 命令系统（`src/command/`）：启动时在现有 CommandRegistry 中为每个 Skill 自动注册 `/skill-name` 斜杠命令，类型为 `prompt`，触发时走现有 dispatch 流程送入 Agent。
+- 命令系统（`src/command/`）：启动时在现有 CommandRegistry 中为每个 Skill 自动注册 `/skill-name` 斜杠命令及别名（如 `cr`），类型为 `prompt`，触发时走现有 dispatch 流程送入 Agent。
 - 工具系统（`src/tool/`）：注册 LoadSkill 为系统工具，Agent 通过 tool call 机制按需激活 Skill。
-- 上下文构建（`src/bootstrap/context-builder.ts`）：扩展现有 `buildNewSessionContext`，接入 Skill 摘要注入和激活 Skill 正文注入。
+- Agent 循环（`src/agent/loop.ts`）：扩展 AgentLoopConfig，支持 `allowedTools` 过滤——在 full mode 时也应用白名单（目前仅 plan mode 有工具过滤）。
+- 上下文构建（`src/bootstrap/context-builder.ts`）：扩展现有 `buildNewSessionContext`，扫描 Skill 并将原始数据传入 BootstrapContext，由 ChatService 统一管理。
 
 ## 核心数据结构
 
@@ -29,6 +32,7 @@ Skill 系统由 6 个模块组成，分层清晰：
 | description | string | 是 | 一句话说明，用于阶段一摘要和意图匹配 |
 | mode | `"inline" \| "fork"` | 是 | 执行模式 |
 | allowedTools | string[] | 否 | 可见工具白名单，缺省表示不限制（LoadSkill 始终可用） |
+| aliases | string[] | 否 | 命令别名，如 `["cr"]` |
 | historyRounds | number | 否 | fork 模式带入的历史轮数，仅 mode=fork 时有效 |
 | model | string | 否 | 指定模型，如 `claude-sonnet-4-6` |
 
@@ -106,8 +110,8 @@ Skill 系统由 6 个模块组成，分层清晰：
 - `clear(): void` — 清空所有激活
 - `getActiveSkillBodies(): string[]` — 获取激活 Skill 正文
 - `getActiveSummaries(): string[]` — 获取激活 Skill 状态行
-- `getEffectiveAllowedTools(allTools: string[]): string[]` — 计算工具白名单
-- `validateAllowedTools(allToolNames: Set<string>): SkillDiagnostic[]` — 校验白名单
+- `getEffectiveAllowedTools(allTools: string[]): string[]` — 计算工具白名单：取所有激活 Skill 的 allowedTools 并集；若任一 Skill 无 allowedTools 限制则返回全部 allTools。结果集中始终包含 `LoadSkill`。
+- `validateAllowedTools(allToolNames: Set<string>): SkillDiagnostic[]` — 校验白名单（仅内置工具，MCP 异步注册的工具除外）
 
 **依赖：** types.ts
 
@@ -138,11 +142,14 @@ Skill 系统由 6 个模块组成，分层清晰：
 
 **改动范围：**
 
-1. **`src/tool/registry.ts`** — 注册 LoadSkill 为系统工具
-2. **`src/command/registry.ts`** — 启动时为 Skill 自动注册斜杠命令
-3. **`src/bootstrap/context-builder.ts`** — 注入 Skill 摘要和激活正文
-4. **`src/tui/app.tsx`** — 清空对话时清除 Skill 激活
-5. **`src/chat/chat-service.ts`** — 每轮重建时注入激活 Skill 正文
+1. **`src/tool/registry.ts`** — 注册 LoadSkill 为系统工具；新增 `getToolNames()` 和 `getMetasWithFilter()` 方法
+2. **`src/command/registry.ts`** — 启动时为 Skill 自动注册斜杠命令及别名
+3. **`src/bootstrap/context-builder.ts`** — 扫描 Skill，将 `{ skills, diagnostics }` 原始数据传入 BootstrapContext
+4. **`src/bootstrap/types.ts`** — 扩展 BootstrapContext：`skillScanData: { skills: Skill[]; diagnostics: SkillDiagnostic[] }`
+5. **`src/tui/app.tsx`** — 清空对话时调用 `skillRegistry.clear()`
+6. **`src/chat/chat-service.ts`** — 从 BootstrapContext.skillScanData 创建唯一的 SkillRegistry 实例，向 AgentLoop 暴露 allowedTools 过滤器
+7. **`src/agent/types.ts`** — AgentLoopConfig 新增 `allowedTools?: string[]` 字段
+8. **`src/agent/loop.ts`** — full mode 时也应用 allowedTools 过滤（如果配置了）
 
 ## 模块交互
 
@@ -205,9 +212,11 @@ Skill 激活后，Agent 收到 Skill 正文
   │   └─ Agent 在当前对话中执行 SOP → 结果留在主历史
   │
   └─ mode=fork
-      └─ Agent 看到指令："开启独立对话执行以下 SOP..."
-          ├─ 新 Agent 实例执行，主对话等待
-          └─ 执行完毕，摘要写回主对话
+        ├─ ChatService 创建独立 Message[]（可选：从主历史带入最近 N 轮）
+        ├─ 在新上下文中运行 AgentLoop
+        ├─ 收集执行结果，提取摘要
+        ├─ 将摘要作为 tool_result 写回主对话
+        └─ 主对话继续（不包含 fork 中间交互）
 ```
 
 ## 文件组织
@@ -216,7 +225,7 @@ Skill 激活后，Agent 收到 Skill 正文
 src/skill/
 ├── types.ts          — SkillFrontmatter、Skill、SkillSummary、SkillDiagnostic、SkillLoadResult
 ├── loader.ts         — scanAll、loadOne、getDirs，YAML frontmatter 解析
-├── registry.ts       — SkillRegistry：摘要、激活、白名单、校验
+├── registry.ts       — SkillRegistry：摘要、激活、白名单（+LoadSkill）、校验
 ├── activator.ts      — loadSkill、loadSkillByIntent，参数替换
 └── builtin/
     ├── commit.md     — inline 模式，自动提交
@@ -225,17 +234,22 @@ src/skill/
 
 src/command/
 ├── builtin/
-│   └── index.ts     — [改动] 命令列表从 Skill Registry 动态获取
+│   └── index.ts     — [改动] 命令列表从 Skill Registry 动态获取，含别名
 └── dispatcher.ts     — [不改动] 复用现有 dispatch
 
 src/tool/
 ├── tools/
 │   └── load-skill.ts — [新建] LoadSkill 系统工具定义
-├── registry.ts       — [改动] 注册 LoadSkill
+├── registry.ts       — [改动] 注册 LoadSkill；新增 getToolNames/getMetasWithFilter
 └── types.ts          — [不改动] 复用现有 Tool、ToolResult
 
+src/agent/
+├── types.ts          — [改动] AgentLoopConfig 新增 allowedTools 字段
+└── loop.ts           — [改动] full mode 时也应用 allowedTools 过滤
+
 src/bootstrap/
-└── context-builder.ts — [改动] 新增 Skill 摘要和正文注入
+├── types.ts          — [改动] BootstrapContext 新增 skillScanData
+└── context-builder.ts — [改动] 扫描 Skill，返回原始数据
 
 src/tui/
 └── app.tsx           — [改动] 清空对话时清除 Skill 激活
@@ -249,7 +263,10 @@ src/tui/
 | 三层目录路径 | 内置 `<codia>/skills/builtin/`；用户 `~/.codia/skills/`；项目 `<root>/.codia/skills/` | 与现有 MEWCODE.md 三层加载路径模式一致 |
 | 命令类型 | 复用现有 `"prompt"` 类型 Command | 现有 dispatch 已支持 prompt 型 |
 | Fork 实现方式 | 复用现有 Agent loop + 新 Agent 实例 | 不引入进程隔离，Fork = 新对话上下文 + 独立 Agent |
-| 白名单计算 | 多 Skill 激活取并集；有任一不限则全部可用 | 安全优先：显式限制才收窄 |
+| 白名单计算 | 多 Skill 激活取并集，始终包含 LoadSkill；有任一不限则全部可用 | 安全优先：显式限制才收窄；LoadSkill 不受限保证 Skill 间互调 |
+| SkillRegistry 实例 | BootstrapContext 传原始数据，ChatService 创建唯一实例 | 避免 ContextBuilder 和 ChatService 各持一个实例导致激活状态不同步 |
+| MCP 工具校验 | 启动时仅校验内置工具，MCP 工具不做启动校验 | MCP 工具异步注册，启动时尚未就绪 |
+| 单文件/目录型冲突 | 同一目录下两者同时存在时，目录型优先 | 目录型更完整（含资源），视为更精确的意图 |
 | 参数替换时机 | LoadSkill 调用时立即替换 | 替换后缓存到 Registry，每轮无需重复解析 |
 | 意图匹配 | Agent 自行读 name/description 匹配 | Agent tool use 机制本身就是意图决策器 |
 | 文件扫描 | Node.js fs 同步 API | 启动阶段一次性扫描，异步无收益 |

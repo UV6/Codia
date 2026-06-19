@@ -20,6 +20,7 @@ Codia 当前已有命令系统（`/help`、`/session` 等）和指令系统（ME
 - **F2: 单文件与目录型两种形式**
   - 单文件：一个 `skill-name.md` 即一个 Skill。
   - 目录型：一个目录内含入口 `skill.md` + 专属资源子目录（`reference/`、`script/`、`example/` 等），整套作为一个能力包分发和加载。入口文件仍为 Markdown + YAML frontmatter。
+  - 同一目录下同时存在 `name.md`（单文件）和 `name/skill.md`（目录型）时，目录型优先。
 - **F3: 三级存放与优先级覆盖** — Skill 存放在三层目录：内置（`<codia>/skills/builtin/`）、用户（`~/.codia/skills/`）、项目（`<project>/.codia/skills/`）。同名 Skill 按优先级覆盖：项目 > 用户 > 内置。
 - **F4: 解析容错** — 单个 Skill 文件解析失败时跳过并输出诊断警告，不阻断其他 Skill 的加载。
 
@@ -32,24 +33,24 @@ Codia 当前已有命令系统（`/help`、`/session` 等）和指令系统（ME
   LoadSkill 加载完整指令正文及目录型 Skill 的附属资源。
 - **F7: 激活后上下文钉住** — 已激活 Skill 的完整指令钉在环境上下文最显眼的位置，每轮对话重建时都在。多个 Skill 可同时激活，各自内容依次展示。
 - **F8: Skill 间相互调用** — 一个已激活的 Skill 可以调用另一个 Skill（通过 LoadSkill），实现组合工作流。
-- **F9: 热更新** — Skill 源文件变更后，重新加载即可生效，无需重启进程。
+- **F9: 热更新** — Skill 源文件变更后，通过 LoadSkill 重新加载同名 Skill 即可覆盖已激活版本，无需重启进程。
 - **F10: 会话清空时清除激活** — 用户清空对话时，已激活的 Skill 一并清除。
 
 ### 工具白名单
 
 - **F11: allowedTools 收窄工具** — 每个 Skill 的 frontmatter 中用 `allowedTools` 声明可见工具白名单。Skill 激活后，当前可用工具被收窄为白名单中的工具。
-- **F12: 启动校验** — 启动时校验所有 Skill 的 allowedTools 中引用的工具名在系统工具注册表中是否存在，不存在立即报错并指出是哪个 Skill 引用了哪个不存在的工具。
+- **F12: 启动校验** — 启动时校验所有 Skill 的 allowedTools 中引用的工具名在系统内置工具注册表中是否存在，不存在立即报错。MCP 工具因异步注册，启动时不做校验（仅校验内置工具）。
 - **F13: LoadSkill 不受白名单约束** — LoadSkill 是系统级工具，不受任何 allowedTools 约束，始终可用且所有工具对其可见。
 
 ### 执行模式
 
 - **F14: Inline 模式** — 共享当前对话上下文，执行结果留在主对话历史中。适合轻量操作。
-- **F15: Fork 模式** — 开启独立对话上下文执行 Skill，执行完毕将摘要回流到主对话。可配置带入历史轮数。
+- **F15: Fork 模式** — 开启独立对话上下文执行 Skill（新 Agent 实例 + 独立 Message[]），执行完毕后摘要以 tool result 形式写回主对话。可配置带入历史轮数。上下文隔离由 Agent 架构保证，不需要进程级隔离。
 - **F16: 模式声明** — 每个 Skill 在 frontmatter 中用 `mode: inline | fork` 声明模式，调用时自动按其声明执行。
 
 ### 命令注册
 
-- **F17: 自动注册斜杠命令** — 每个 Skill 自动注册为 `/skill-name` 斜杠命令。
+- **F17: 自动注册斜杠命令** — 每个 Skill 自动注册为 `/skill-name` 斜杠命令。Skill frontmatter 可声明 `aliases` 字段，自动生成别名命令（如 `cr` → `/cr`）。
 - **F18: 参数传递** — 用户调用 `/skill-name arg1 arg2` 时，参数自动替换正文中 `{{arg1}}` 等占位符。
 
 ### 内置样板

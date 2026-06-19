@@ -16,11 +16,13 @@
 | 新建 | `src/__tests__/skill/registry.test.ts` | registry 单元测试 |
 | 新建 | `src/__tests__/skill/activator.test.ts` | activator 单元测试 |
 | 修改 | `src/tool/registry.ts` | 注册 LoadSkill 工具 |
-| 修改 | `src/bootstrap/context-builder.ts` | 注入 Skill 摘要和激活正文 |
-| 修改 | `src/bootstrap/types.ts` | 扩展 BootstrapContext，增加 skillSummaries 和 activeSkillBodies 字段 |
-| 修改 | `src/command/builtin/index.ts` | 从 Skill 列表动态生成命令，移除被替换的旧 review 命令 |
+| 修改 | `src/bootstrap/context-builder.ts` | 扫描 Skill，将原始数据传入 BootstrapContext |
+| 修改 | `src/bootstrap/types.ts` | 扩展 BootstrapContext，增加 skillScanData 字段 |
+| 修改 | `src/command/builtin/index.ts` | 从 Skill 列表动态生成命令（含别名），移除旧 reviewCommand |
 | 修改 | `src/tui/app.tsx` | 清空对话时清除 Skill 激活；启动时初始化 Skill 系统 |
-| 修改 | `src/chat/chat-service.ts` | 接收 Skill 摘要和激活正文，注入 system prompt |
+| 修改 | `src/chat/chat-service.ts` | 创建唯一 SkillRegistry，注入 system prompt，注册 LoadSkill |
+| 修改 | `src/agent/types.ts` | AgentLoopConfig 新增 allowedTools 字段 |
+| 修改 | `src/agent/loop.ts` | full mode 时也应用 allowedTools 过滤 |
 
 ## T1: 定义核心类型
 
@@ -29,7 +31,7 @@
 **步骤：**
 1. 定义 `SkillMode` 类型：`"inline" | "fork"`
 2. 定义 `SkillSource` 类型：`"builtin" | "user" | "project"`
-3. 定义 `SkillFrontmatter` 接口：name（必填）、description（必填）、mode（必填）、allowedTools（可选 string[]）、historyRounds（可选 number）、model（可选 string）
+3. 定义 `SkillFrontmatter` 接口：name（必填）、description（必填）、mode（必填）、allowedTools（可选 string[]）、aliases（可选 string[]）、historyRounds（可选 number）、model（可选 string）
 4. 定义 `Skill` 接口：source、dir、frontmatter、body
 5. 定义 `SkillSummary` 接口：name、description、source
 6. 定义 `SkillDiagnostic` 接口：filePath、level（`"error" | "warning"`）、message
@@ -48,7 +50,8 @@
    - 遍历 `.md` 文件（单文件 Skill）
    - 遍历子目录中带 `skill.md` 的（目录型 Skill），记录 dir 字段
    - 每个文件用 `parseSkillFile` 解析，失败时生成 warning 级 SkillDiagnostic 并跳过
-   - 单文件 Skill 和目录型 Skill 分别处理：单文件用文件名（去 .md）作为 name 兜底，目录型用子目录名
+   - 单文件用文件名（去 .md）作为 name 兜底，目录型用子目录名
+   - 同一目录下 `name.md` 和 `name/skill.md` 同时存在时，目录型优先（丢弃单文件版本）
 4. 实现 `scanAll(projectRoot: string): { skills: Skill[]; diagnostics: SkillDiagnostic[] }` — 调用 `scanDir` 扫描三层，按内置→用户→项目的顺序以 name 去重覆盖（后扫的覆盖先扫的），累积诊断信息
 
 **验证：** `npx tsc --noEmit src/skill/loader.ts` 编译通过
@@ -66,8 +69,8 @@
    - `clear(): void` — 清空激活 Map
    - `getActiveSkillBodies(): string[]` — 返回所有激活 Skill 的正文（经参数替换后）
    - `getActiveSummaries(): string[]` — 返回 `[skill-name] mode 激活中` 格式的状态行
-   - `getEffectiveAllowedTools(allTools: string[]): string[]` — 计算有效工具：取所有激活 Skill 的 allowedTools 并集；若任一 Skill 无 allowedTools 限制则返回全部 allTools
-   - `validateAllowedTools(allToolNames: Set<string>): SkillDiagnostic[]` — 遍历摘要中的 Skill，校验每个的 allowedTools 引用的工具名是否在 allToolNames 中存在，不存在生成 error 级诊断
+   - `getEffectiveAllowedTools(allTools: string[]): string[]` — 计算有效工具：取所有激活 Skill 的 allowedTools 并集；若任一 Skill 无 allowedTools 限制则返回全部 allTools。结果中始终包含 `"LoadSkill"`（不受白名单约束）
+   - `validateAllowedTools(allToolNames: Set<string>): SkillDiagnostic[]` — 遍历摘要中的 Skill，校验每个的 allowedTools 引用的工具名是否在 allToolNames 中存在。仅校验内置工具，MCP 异步注册的工具除外。不存在生成 error 级诊断
 2. 参数替换逻辑：用正则 `\{\{(\w+)\}\}` 匹配占位符，按 `args` 数组索引替换（`{{arg1}}` 替换为 `args[0]`，`{{arg2}}` 替换为 `args[1]`，以此类推）
 
 **验证：** `npx tsc --noEmit src/skill/registry.ts` 编译通过
@@ -120,7 +123,7 @@
 **文件：** `src/skill/builtin/review.md`
 **依赖：** 无
 **步骤：**
-1. YAML frontmatter：`name: review`、`description: 在独立上下文中审查代码变更，五维度客观评估`、`mode: fork`、`historyRounds: 3`
+1. YAML frontmatter：`name: review`、`description: 在独立上下文中审查代码变更，五维度客观评估`、`mode: fork`、`aliases: ["cr"]`、`historyRounds: 3`
 2. 正文 SOP：
    - 你是代码审查专家，在独立对话中审查代码变更
    - 五个维度：逻辑正确性、安全性、性能、代码风格、可维护性
@@ -160,25 +163,21 @@
 **文件：** `src/bootstrap/types.ts`
 **依赖：** T1
 **步骤：**
-1. 在 `BootstrapContext` 接口中新增两个字段：
-   - `skillSummaries: string` — 阶段一 Skill 摘要文本（注入 prompt）
-   - `activeSkillBodies: string` — 已激活 Skill 正文文本（注入 prompt 顶部）
+1. 在 `BootstrapContext` 接口中新增字段：
+   - `skillScanData: { skills: Skill[]; diagnostics: SkillDiagnostic[] }` — Skill 扫描原始数据，由 ChatService 用于创建唯一的 SkillRegistry
 
 **验证：** `npx tsc --noEmit src/bootstrap/types.ts` 编译通过
 
-## T11: 集成 Skill 系统到 ContextBuilder
+## T11: 集成 Skill 扫描到 ContextBuilder
 
 **文件：** `src/bootstrap/context-builder.ts`
-**依赖：** T10、T2、T3
+**依赖：** T10、T2
 **步骤：**
 1. 在 `buildNewSessionContext` 中新增：
    - 调用 `scanAll(projectRoot)` 获取 skills 和 diagnostics
-   - 创建 `SkillRegistry` 实例，调用 `setSummaries`
-   - 生成 skillSummaries 文本：`## 可用 Skill\n\n` + 每个 Skill 一行 `- **/name**: description`
-   - 校验 allowedTools：`registry.validateAllowedTools(new Set(allToolNames))`
-   - 将所有 Skill 相关诊断合并到 `diag.entries`
-   - 返回 `skillSummaries` 文本和空的 `activeSkillBodies`
-2. `BootstrapContext` 中新增字段后，确保 `buildResumeContext` 也传递这些字段
+   - 将 Skill 相关诊断合并到 `diag.entries`
+   - 返回 `skillScanData: { skills, diagnostics }`（不创建 SkillRegistry——由 ChatService 统一管理）
+2. 确保 `buildResumeContext` 也传递 `skillScanData`
 
 **验证：** `npx tsc --noEmit src/bootstrap/context-builder.ts` 编译通过
 
@@ -190,29 +189,34 @@
 1. 将从 Skill 列表生成命令的逻辑封装为函数 `buildSkillCommands(skills: SkillSummary[]): CommandDef[]`
 2. 每个 Skill 生成一个 `CommandDef`：
    - `name`: skill.name
+   - `aliases`: skill.aliases（如有）
    - `description`: skill.description
    - `type`: `"prompt"`
-   - `promptText`: `请调用 LoadSkill 工具，加载 "${name}" Skill。{{args}}`
+   - `promptText`: `请调用 LoadSkill 工具，加载 "${skill.name}" Skill。`
    - `handler`: 空函数
-3. 移出现有的硬编码 `reviewCommand`（review 命令现在由 Skill 系统生成）
-4. `builtinCommands` 改为函数调用结果，同时保留非 Skill 命令（help、compact、clear 等）
+3. 移出现有的硬编码 `reviewCommand`（review 命令现在由 Skill 系统生成，别名 cr 也由 Skill 定义）
+4. `builtinCommands` 改为 `getBuiltinCommands(skills: SkillSummary[])`，接受 Skill 摘要列表，生成完整命令列表（非 Skill 命令 + Skill 命令）
 
 **验证：** `npx tsc --noEmit src/command/builtin/index.ts` 编译通过
 
 ## T13: 集成 Skill 系统到 ChatService
 
 **文件：** `src/chat/chat-service.ts`
-**依赖：** T10、T11
+**依赖：** T10、T11、T4、T5
 **步骤：**
 1. 在 `ChatService` 中新增字段：`private skillRegistry: SkillRegistry`、`private skillActivator: SkillActivator`
-2. 构造函数中：接收 `BootstrapContext` 的 `skillSummaries` 和 `activeSkillBodies` 字段，存入实例
-3. 在 `SystemPromptBuilder` 中注入：
-   - `skillSummaries` 作为独立 Section（priority 略低于核心指令）
-   - `activeSkillBodies` 作为最高 priority Section（钉在顶部）
-4. 新增 `getSkillRegistry(): SkillRegistry` 公开方法
-5. 每轮对话重建 system prompt 时同步激活 Skill 的正文
-6. 将 LoadSkill 工具注册到 ToolRegistry：`this.registry.register(loadSkillTool)`（在六个核心工具之后）
-7. LoadSkill 工具的 execute 回调需要能访问 `skillActivator`——在注册时注入
+2. 构造函数中从 `BootstrapContext.skillScanData` 创建唯一的 SkillRegistry 实例：
+   - `this.skillRegistry = new SkillRegistry()`
+   - `this.skillRegistry.setSummaries(skillScanData.skills → SkillSummary[])`
+   - 生成 skillSummaries 文本：`"## 可用 Skill\n\n" + 每个 Skill 一行 "- **/name**: description"`
+3. 创建 `SkillActivator`，传入 `skillRegistry` 和 `projectRoot`
+4. 在 `SystemPromptBuilder` 中注入：
+   - skillSummaries 文本作为独立 Section（priority 略低于核心指令）
+   - 激活 Skill 正文（`skillRegistry.getActiveSkillBodies()`）作为最高 priority Section
+5. 新增 `getSkillRegistry(): SkillRegistry` 公开方法
+6. 每轮对话重建 system prompt 时通过 `builder.set()` 更新激活 Skill 正文
+7. 将 LoadSkill 工具注册到 ToolRegistry：`this.registry.register(loadSkillTool(skillActivator))`
+8. 启动时校验白名单（仅内置工具）：将诊断合并到 bootstrap diagnostics
 
 **验证：** `npx tsc --noEmit src/chat/chat-service.ts` 编译通过
 
@@ -228,7 +232,34 @@
 
 **验证：** `npx tsc --noEmit src/tui/app.tsx` 编译通过
 
-## T15: 编写 loader 单元测试
+## T15: 扩展 AgentLoopConfig 并应用 allowedTools
+
+**文件：** `src/agent/types.ts`、`src/agent/loop.ts`
+**依赖：** T13
+**步骤：**
+1. 在 `AgentLoopConfig` 中新增 `allowedTools?: string[]` 字段
+2. 在 `AgentLoop.run()` 中：构建工具列表时若 `allowedTools` 存在，过滤 ToolMeta 仅保留白名单中的工具（同时应用于 full mode 和 plan mode）
+3. ChatService 中每轮将 `skillRegistry.getEffectiveAllowedTools(allToolNames)` 的结果传入 `AgentLoopConfig`
+
+**验证：** `npx tsc --noEmit src/agent/loop.ts` 编译通过
+
+## T16: 实现 Fork 模式执行
+
+**文件：** `src/skill/fork.ts`（新建）
+**依赖：** T13、T15
+**步骤：**
+1. 实现 `executeFork(skill: Skill, options: { projectRoot: string; historyMessages?: Message[]; config: ChatConfig }): Promise<string>` 函数
+2. 逻辑：
+   - 创建独立的 `Message[]`，若 skill.frontmatter.historyRounds > 0，从主历史复制最近 N 轮
+   - 注入 Skill 正文作为 system prompt
+   - 在新 Message[] 上运行 AgentLoop（单轮或有限轮）
+   - 收集最后一条 assistant 消息作为摘要
+   - 返回摘要字符串
+3. ChatService 中 LoadSkill 的 execute 回调：当 Skill mode 为 fork 时，调用 `executeFork` 并将摘要作为 tool_result 返回
+
+**验证：** `npx tsc --noEmit src/skill/fork.ts` 编译通过
+
+## T17: 编写 loader 单元测试
 
 **文件：** `src/__tests__/skill/loader.test.ts`
 **依赖：** T2
@@ -240,12 +271,13 @@
    - YAML frontmatter 格式错误时跳过并产生诊断
    - 缺少必填字段时跳过并产生诊断
    - 三层优先级覆盖：项目 Skill 覆盖同名用户 Skill
+   - 同一目录下 `name.md` 和 `name/skill.md` 并存时，目录型优先
    - 空目录不报错，返回空列表
    - 支持 `{{arg1}}` 占位符出现在正文中
 
 **验证：** `pnpm test src/__tests__/skill/loader.test.ts` 全部通过
 
-## T16: 编写 registry 单元测试
+## T18: 编写 registry 单元测试
 
 **文件：** `src/__tests__/skill/registry.test.ts`
 **依赖：** T3
@@ -257,12 +289,13 @@
    - deactivate 后对应 Skill 不再出现
    - clear 后所有激活清空
    - allowedTools 取并集：Skill A 白名单 [Bash] + Skill B 白名单 [Read] = [Bash, Read]
+   - allowedTools 结果中始终包含 LoadSkill（即使不在任何白名单中）
    - 无限制 Skill 激活时 getEffectiveAllowedTools 返回全部
    - validateAllowedTools 检测不存在的工具名
 
 **验证：** `pnpm test src/__tests__/skill/registry.test.ts` 全部通过
 
-## T17: 编写 activator 单元测试
+## T19: 编写 activator 单元测试
 
 **文件：** `src/__tests__/skill/activator.test.ts`
 **依赖：** T4
@@ -281,17 +314,15 @@
 ```
 T1 ──→ T2 ──→ T4 ──→ T5
   │      │             │
-  │      └──→ T3 ──→ T4 ──→ T5
-  │                    │
-  │                    └──→ T9 ──→ T13 ──→ T14
-  │                                    │
-  ├── T10 ──→ T11 ──→ T13             │
-  │                                    │
-  ├── T12 ─────────────────────────────┘
+  │      └──→ T3 ──→ T4 ──→ T5 ──→ T9 ──→ T13 ──→ T15 ──→ T16
+  │                    │                     │
+  ├── T10 ──→ T11 ────┘                     │
+  │                                          │
+  ├── T12 ──→ T14 ──────────────────────────┘
   │
   └── T6、T7、T8（与 T2-T14 并行）
-  
-T2 ──→ T15（测试）
-T3 ──→ T16（测试）
-T4 ──→ T17（测试）
+
+T2 ──→ T17（loader 测试）
+T3 ──→ T18（registry 测试）
+T4 ──→ T19（activator 测试）
 ```
