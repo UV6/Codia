@@ -44,6 +44,10 @@ import { toSummaries } from "../skill/loader.js";
 import type { Skill, SkillDiagnostic } from "../skill/types.js";
 import { HookEngine } from "../hook/engine.js";
 import { loadAllHooks } from "../hook/loader.js";
+import { AgentRoleRegistry } from "../agent/role/registry.js";
+import { TaskManager } from "../agent/task-manager.js";
+import { AgentTool } from "../agent/agent-tool.js";
+import { createTaskTools } from "../agent/task-tools.js";
 
 // ChatService —— 对话核心
 // 负责消息历史管理、会话持久化、模式与权限控制，循环逻辑委托给 AgentLoop
@@ -78,6 +82,10 @@ export class ChatService {
   private skillRegistry: SkillRegistry;
   private skillActivator: SkillActivator;
   private skillSummariesText: string;
+
+  // Agent 系统
+  private agentRoleRegistry: AgentRoleRegistry;
+  private taskManager: TaskManager;
 
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
@@ -210,6 +218,47 @@ export class ChatService {
     );
 
     this.agentLoop = new AgentLoop(this.registry, this.contextManager, this.hookEngine);
+
+    // 初始化 Agent 系统
+    this.agentRoleRegistry = new AgentRoleRegistry(projectRoot);
+    this.agentRoleRegistry.reload();
+
+    this.taskManager = new TaskManager();
+    this.taskManager.onComplete((task) => {
+      // 注入 <task-notification> 到主对话
+      const content = [
+        `<task-notification>`,
+        `  <id>${task.id}</id>`,
+        `  <status>${task.status}</status>`,
+        `  <type>${task.type}</type>`,
+        `  <description>${task.description}</description>`,
+        task.result ? `  <result>${task.result.text.slice(0, 500)}</result>` : "",
+        `</task-notification>`,
+      ].join("\n");
+      this.messages.push({
+        role: "user",
+        content,
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    // 注册 Agent 工具
+    this.registry.register(
+      new AgentTool(
+        this.agentRoleRegistry,
+        this.taskManager,
+        config,
+        this.provider,
+        () => this.messages,
+        () => this.registry,
+        this.hookEngine,
+      ),
+    );
+
+    // 注册任务管理工具
+    for (const tool of createTaskTools(this.taskManager)) {
+      this.registry.register(tool);
+    }
 
     // 构建完整 System Prompt：Skill 摘要 + 项目指令 + 记忆索引 + 七个固定模块 + 环境信息
     const builder = new SystemPromptBuilder();
