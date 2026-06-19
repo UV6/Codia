@@ -7,6 +7,7 @@ export interface AgentRoleFrontmatter {
   permissionMode?: "default" | "acceptsEdit" | "plan" | "bypassPermissions"; // 默认 "bypassPermissions"
   tools?: string[]; // 白名单，缺省不限
   disallowedTools?: string[]; // 黑名单，在白名单基础上再剔除
+  isolation?: "worktree"; // 隔离模式：worktree 为 git worktree 文件系统隔离
 }
 
 // AgentRole —— 加载后的完整角色对象，body 伴随子 Agent 整个生命周期

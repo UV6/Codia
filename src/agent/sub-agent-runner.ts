@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import type { Message } from "../provider/types.js";
 import { ToolRegistry } from "../tool/registry.js";
 import { AgentLoop } from "./loop.js";
@@ -7,6 +9,9 @@ import { RuleEngine } from "../permission/rule-engine.js";
 import type { AgentLoopConfig, SubAgentConfig, SubAgentResult } from "./types.js";
 import type { ToolMeta } from "../tool/types.js";
 import type { TaskManager } from "./task-manager.js";
+import { WorktreeManager } from "../worktree/manager.js";
+import { RealGitWorktreeOps } from "../worktree/git-ops.js";
+import type { WorktreeConfig } from "../worktree/types.js";
 
 // SubAgentRunner —— 子 Agent 运行器，构造隔离环境并驱动 AgentLoop
 export class SubAgentRunner {
@@ -19,6 +24,56 @@ export class SubAgentRunner {
   // run —— 执行子 Agent 并返回结果
   async run(): Promise<SubAgentResult> {
     const { config } = this;
+
+    let worktreeManager: WorktreeManager | null = null;
+    let worktreeName: string | null = null;
+    const originalCwd = config.cwd;
+    const originalPrompt = config.prompt;
+
+    // 0. 检查是否需要 worktree 隔离
+      if (config.role?.frontmatter.isolation === "worktree") {
+        // 生成唯一名称：agent-a<hex6>
+        worktreeName = `agent-a${randomBytes(3).toString("hex")}`;
+
+        const wtConfig: WorktreeConfig = {
+          repoRoot: config.cwd,
+          baseBranch: "main",
+          worktreesDir: `${config.cwd}/.codia/worktrees`,
+          copyPatterns: [".claude/**", "CLAUDE.md"],
+          symlinkDirs: [],
+          // 检测 node_modules 是否存在，有则加入软链列表
+        };
+
+        // 检测 node_modules 是否存在
+        if (existsSync(`${config.cwd}/node_modules`)) {
+          wtConfig.symlinkDirs.push("node_modules");
+        }
+
+        const ops = new RealGitWorktreeOps(config.cwd);
+        worktreeManager = new WorktreeManager(wtConfig, ops);
+
+        try {
+          const { cwd: worktreeCwd } = await worktreeManager.enter(worktreeName);
+
+          // 替换工作目录
+          (config as { cwd: string }).cwd = worktreeCwd;
+
+          // 拼接上下文通知文本到 prompt 前面
+          const notification = [
+            `你在一个隔离的 Git Worktree 中工作。工作目录：\`${worktreeCwd}\`。`,
+            `- 父 Agent 传来的文件路径指向主工作目录（${originalCwd}），请翻译为你本地的对应路径`,
+            `- 在编辑任何文件之前，必须重新读取该文件以确保你看到的是最新内容`,
+            `- 完成后，你的所有改动都在此隔离目录中，父 Agent 会决定是否合并`,
+          ].join("\n");
+
+          (config as { prompt: string }).prompt = `${notification}\n\n---\n\n${originalPrompt}`;
+        } catch (e) {
+          console.error(`[SubAgentRunner] Worktree 创建失败，回退到原始工作目录：${(e as Error).message}`);
+          // worktree 创建失败，回退到原始 cwd，不阻塞子 Agent 执行
+          worktreeManager = null;
+          worktreeName = null;
+        }
+      }
 
     // 1. 构造消息
     const messages: Message[] = config.type === "definition"
@@ -137,6 +192,25 @@ export class SubAgentRunner {
         rounds,
         toolCalls,
       };
+    } finally {
+      // 清理 worktree
+      if (worktreeManager && worktreeName) {
+        try {
+          // 检查变更状态
+          const info = await worktreeManager.info(worktreeName);
+          if (!info.isClean || info.commitCountAhead > 0) {
+            // 有变更 → 保留 worktree
+            await worktreeManager.exit(worktreeName, { keep: true });
+            console.log(`[SubAgentRunner] Worktree 有变更，保留：${info.path}`);
+          } else {
+            // 无变更 → 自动清理
+            await worktreeManager.exit(worktreeName, { force: true });
+            console.log(`[SubAgentRunner] Worktree 无变更，已清理：${info.path}`);
+          }
+        } catch (e) {
+          console.error(`[SubAgentRunner] Worktree 清理失败：${(e as Error).message}`);
+        }
+      }
     }
 
     return {

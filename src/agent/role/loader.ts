@@ -87,6 +87,11 @@ export function parseRoleFile(
     const permVal = fm.permissionMode as string | undefined;
     if (permVal && !validModes.includes(permVal)) return null;
 
+    // 校验 isolation 合法值
+    const validIsolations = ["worktree"];
+    const isolationVal = fm.isolation as string | undefined;
+    if (isolationVal && !validIsolations.includes(isolationVal)) return null;
+
     const frontmatter: AgentRoleFrontmatter = {
       name: fm.name as string,
       description: fm.description as string,
@@ -95,6 +100,7 @@ export function parseRoleFile(
       permissionMode: permVal as AgentRoleFrontmatter["permissionMode"],
       tools: fm.tools as string[] | undefined,
       disallowedTools: fm.disallowedTools as string[] | undefined,
+      isolation: isolationVal as AgentRoleFrontmatter["isolation"],
     };
 
     return {
