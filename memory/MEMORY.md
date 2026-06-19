@@ -1,5 +1,8 @@
 # Memory Index
 
+- [project_knowledge] | ink ^5.2.0 | React CLI UI 框架 | (know-1781889162397-xx8un2)
+- [project_knowledge] - **类型**: ESM（`"type": "module"`） (know-1781889162397-7a2frt)
+- [project_knowledge] - **描述**: 终端 AI 编程助手（类似 Claude Code） (know-1781889162396-b4ahcp)
 - [project_knowledge] 项目根目录 `/Users/liuwei/Code/Codia` 共 23 个条目，主要目录结构： (know-1781882223123-v9fp9r)
 - [project_knowledge] - `AGENTS.md`, `CLAUDE.md`, `codia.yaml`, `README.md` — 项目文档 (know-1781877544132-mpfwvw)
 - [project_knowledge] - `.claude/`, `.codegraph/`, `.codia/`, `.git/` — 配置/元数据目录 (know-1781877544131-l33lwj)
