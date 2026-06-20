@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Box, Text } from "ink";
 import { useInput } from "ink";
+import { basename } from "node:path";
 import { InputBox } from "./input-box.js";
 import { ChatView } from "./chat-view.js";
 import { ThinkingBox } from "./thinking-box.js";
-import { StatusBar } from "./status-bar.js";
+import { InfoBar } from "./info-bar.js";
 import type { Message } from "../provider/types.js";
 import type { ChatService } from "../chat/chat-service.js";
 import type { HumanChoice, HumanPrompt } from "../permission/types.js";
@@ -31,6 +32,7 @@ export function App({ service }: AppProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
   const [mode, setModeState] = useState<"full" | "plan">(service.currentMode);
+  const [currentRound, setCurrentRound] = useState(0);
 
   // 权限确认状态
   const [permissionPrompt, setPermissionPrompt] = useState<HumanPrompt | null>(null);
@@ -81,6 +83,7 @@ export function App({ service }: AppProps) {
     setUsage(null);
     setThinkingCollapsed(false);
     setIsStreaming(true);
+    setCurrentRound(0);
 
     // 立即把用户消息加入视图
     const userMsg: Message = {
@@ -116,6 +119,9 @@ export function App({ service }: AppProps) {
           case "tool_result":
             // 工具执行完后同步消息历史，让 ChatView 显示命令输出
             setMessages(service.history);
+            break;
+          case "round_start":
+            setCurrentRound(chunk.round);
             break;
           case "stopped":
             // AgentLoop 停止后从 service 同步完整消息历史
@@ -288,18 +294,28 @@ export function App({ service }: AppProps) {
         <ThinkingBox thinking={streamingThinking} collapsed={thinkingCollapsed} />
       )}
 
-      <StatusBar
-        model={service["config"]?.["model"] ?? "unknown"}
-        usage={usage ?? undefined}
-        streaming={isStreaming}
-        mode={mode}
-      />
-
       <InputBox
         onSubmit={handleSubmit}
         disabled={isStreaming || !!permissionPrompt}
         error={error ?? undefined}
         registry={registry}
+      />
+
+      <InfoBar
+        mode={mode}
+        model={service.currentModel}
+        usage={usage ?? undefined}
+        streaming={isStreaming}
+        messageCount={service.history.length}
+        currentRound={currentRound}
+        maxRounds={service.maxRounds}
+        permissionMode={service.currentPermissionMode}
+        toolCount={service.toolCount}
+        mcpCount={service.mcpCount}
+        skillCount={service.skillCount}
+        activeSkillCount={service.activeSkillCount}
+        agentRoleCount={service.agentRoleCount}
+        sessionFile={basename(service.sessionPath)}
       />
     </Box>
   );

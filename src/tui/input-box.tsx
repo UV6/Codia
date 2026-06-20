@@ -49,7 +49,7 @@ export function InputBox({ onSubmit, disabled, error, registry }: InputBoxProps)
   });
 
   return (
-    <Box flexDirection="column">
+    <Box borderStyle="round" borderColor="green" flexDirection="column" paddingX={1}>
       {error && <Text color="red">✗ {error}</Text>}
       {completions.length > 0 && (
         <Box marginBottom={0}>
@@ -64,9 +64,12 @@ export function InputBox({ onSubmit, disabled, error, registry }: InputBoxProps)
         </Box>
       )}
       <Box>
+        <Text color="green">▶</Text>
+        <Text> </Text>
         <Text color="cyan" bold>
-          Codia{" "}
+          Codia
         </Text>
+        <Text> </Text>
         <Text color="yellow">{"> "}</Text>
         {disabled ? (
           <Text dimColor>...</Text>
