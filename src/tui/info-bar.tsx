@@ -44,6 +44,7 @@ export function InfoBar({
       flexDirection="column"
       paddingX={1}
       width="100%"
+      marginTop={0}
     >
       {/* 第一行：会话状态 */}
       <Box flexDirection="row">
