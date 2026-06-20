@@ -49,7 +49,7 @@ export function InputBox({ onSubmit, disabled, error, registry }: InputBoxProps)
   });
 
   return (
-    <Box borderStyle="round" borderColor="green" flexDirection="column" paddingX={1}>
+    <Box borderStyle="round" borderColor="greenBright" flexDirection="column" paddingX={1} width="100%">
       {error && <Text color="red">✗ {error}</Text>}
       {completions.length > 0 && (
         <Box marginBottom={0}>
@@ -64,7 +64,7 @@ export function InputBox({ onSubmit, disabled, error, registry }: InputBoxProps)
         </Box>
       )}
       <Box>
-        <Text color="green">▶</Text>
+        <Text color="greenBright">▶</Text>
         <Text> </Text>
         <Text color="cyan" bold>
           Codia

@@ -43,10 +43,10 @@ export function InfoBar({
       borderColor="green"
       flexDirection="column"
       paddingX={1}
-      marginTop={1}
+      width="100%"
     >
       {/* 第一行：会话状态 */}
-      <Box flexDirection="row" flexWrap="wrap">
+      <Box flexDirection="row">
         <Text color="yellow">⬡ {modeLabel}</Text>
         <Text>  </Text>
         <Text color="blue">🧠 {model}</Text>
@@ -72,7 +72,7 @@ export function InfoBar({
       </Box>
 
       {/* 第二行：系统状态 */}
-      <Box flexDirection="row" flexWrap="wrap">
+      <Box flexDirection="row">
         <Text dimColor>🔧 {toolCount}</Text>
         <Text>  </Text>
         <Text dimColor>🔌 MCP×{mcpCount}</Text>
