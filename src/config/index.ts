@@ -24,6 +24,7 @@ export interface AgentLoopYamlConfig {
 export interface AppConfig extends ChatConfig {
   agentLoop: AgentLoopYamlConfig;
   mcp?: { servers: Record<string, Record<string, unknown>> }; // mcp_servers 段原始值，不做展开（展开在 mcp/config.ts 中）
+  coordinator?: { enabled: boolean }; // Coordinator 模式能力开关
 }
 
 const REQUIRED_FIELDS = ["protocol", "model", "base_url", "api_key"] as const;

@@ -48,6 +48,13 @@ import { AgentRoleRegistry } from "../agent/role/registry.js";
 import { TaskManager } from "../agent/task-manager.js";
 import { AgentTool } from "../agent/agent-tool.js";
 import { createTaskTools } from "../agent/task-tools.js";
+import { TeamManager } from "../team/team-manager.js";
+import { SharedTaskBoard } from "../team/shared-task-board.js";
+import { MailboxSystem } from "../team/mailbox-system.js";
+import { MemberBackend } from "../team/member-backend.js";
+import { LeadOrchestrator } from "../team/lead-orchestrator.js";
+import { createTeamTools } from "../team/team-tools.js";
+import type { AppConfig } from "../config/index.js";
 
 // ChatService —— 对话核心
 // 负责消息历史管理、会话持久化、模式与权限控制，循环逻辑委托给 AgentLoop
@@ -86,6 +93,9 @@ export class ChatService {
   // Agent 系统
   private agentRoleRegistry: AgentRoleRegistry;
   private taskManager: TaskManager;
+
+  // Team 系统
+  private teamManager: TeamManager;
 
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
@@ -260,6 +270,9 @@ export class ChatService {
       this.registry.register(tool);
     }
 
+    // 初始化 Team 系统
+    this.teamManager = new TeamManager();
+
     // 构建完整 System Prompt：Skill 摘要 + 项目指令 + 记忆索引 + 七个固定模块 + 环境信息
     const builder = new SystemPromptBuilder();
     // 注入 Skill 摘要（阶段一）
@@ -372,6 +385,53 @@ export class ChatService {
   // 设置人在回路回调（由 TUI 注入）
   setHumanInTheLoop(callback: HumanInTheLoopCallback): void {
     this.humanInTheLoop = callback;
+  }
+
+  // getTeamManager —— 获取 TeamManager 实例
+  get teamManagerInstance(): TeamManager {
+    return this.teamManager;
+  }
+
+  // setupTeamSession —— 为当前会话注册团队协作工具
+  // memberName: 当前成员名称，isLead: 是否为 Lead
+  async setupTeamSession(
+    teamName: string,
+    memberName: string,
+    isLead: boolean,
+  ): Promise<{ taskBoard: SharedTaskBoard; mailbox: MailboxSystem }> {
+    const teamDir = this.teamManager.getTeamDir(teamName);
+
+    // 创建团队子系统实例
+    const taskBoard = new SharedTaskBoard(teamDir);
+    const mailbox = MailboxSystem.fromTeamDir(teamDir);
+    const memberBackend = new MemberBackend(this.teamManager, mailbox);
+    const orchestrator = new LeadOrchestrator(
+      this.teamManager,
+      taskBoard,
+      mailbox,
+      memberBackend,
+      process.cwd(),
+    );
+
+    // 获取 Lead 名称
+    const team = await this.teamManager.loadTeam(teamName);
+    const leadName = team.lead;
+
+    // 注册团队协作工具到 ToolRegistry
+    const teamTools = createTeamTools(
+      taskBoard,
+      mailbox,
+      memberName,
+      isLead,
+      leadName,
+      memberBackend,
+      orchestrator,
+    );
+    for (const tool of teamTools) {
+      this.registry.register(tool);
+    }
+
+    return { taskBoard, mailbox };
   }
 
   // setMode —— 切换模式（供 UIContext 调用）

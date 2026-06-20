@@ -1,5 +1,7 @@
 import type { Tool, ToolMeta } from "../tool/types.js";
 import type { AgentRole } from "./role/types.js";
+import type { AppConfig } from "../config/index.js";
+import { CoordinatorFilter } from "../team/coordinator-filter.js";
 
 // GLOBAL_BLOCKED_TOOLS —— 第一层：全局禁止，所有子 Agent 永远不可用
 const GLOBAL_BLOCKED_TOOLS = new Set(["Agent", "AskUserQuestion", "TaskStop"]);
@@ -12,15 +14,16 @@ const ASYNC_AGENT_ALLOWED_TOOLS = new Set([
   "grep",
 ]);
 
-// ToolFilterPipeline —— 四层过滤器链，系统级先收窄，角色定义做精筛
+// ToolFilterPipeline —— 五层过滤器链，系统级先收窄，角色定义做精筛，Coordinator 做最后限制
 export class ToolFilterPipeline {
-  // apply —— 串联四层过滤，返回过滤后的 ToolMeta[]
+  // apply —— 串联过滤，返回过滤后的 ToolMeta[]
   static apply(
     allTools: Tool[],
     role: AgentRole | null,
     runInBackground: boolean,
     type: "definition" | "fork",
     customDisallowed?: string[],
+    config?: AppConfig,
   ): ToolMeta[] {
     let tools = allTools;
 
@@ -35,6 +38,9 @@ export class ToolFilterPipeline {
 
     // 第四层：角色定义（仅定义式）
     tools = Layer4RoleFilter(tools, role, type);
+
+    // 第五层：Coordinator 白名单（仅 Coordinator 模式生效）
+    tools = CoordinatorFilter.apply(tools, config);
 
     return tools.map((t) => ({
       name: t.name,
