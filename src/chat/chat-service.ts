@@ -60,7 +60,7 @@ export class ChatService {
   private registry: ToolRegistry;
   private agentLoop: AgentLoop;
   private mode: "full" | "plan" = "full";
-  private maxRounds: number;
+  private _maxRounds: number;
 
   // 提示词管线：基础模块 + 环境信息合并为完整 system prompt
   private fullSystemPrompt: string;
@@ -143,7 +143,7 @@ export class ChatService {
     } else {
       this.messages = loadHistory(this.historyPath);
     }
-    this.maxRounds = options.maxRounds ?? DEFAULT_MAX_ROUNDS;
+    this._maxRounds = options.maxRounds ?? DEFAULT_MAX_ROUNDS;
     this.permissionMode = options.permissionMode ?? "default";
     this.humanInTheLoop = options.humanInTheLoop;
 
@@ -369,6 +369,41 @@ export class ChatService {
     return this.permissionMode;
   }
 
+  // 模型名称
+  get currentModel(): string {
+    return this.config.model;
+  }
+
+  // 最大轮次数
+  get maxRounds(): number {
+    return this._maxRounds;
+  }
+
+  // 已注册工具数
+  get toolCount(): number {
+    return this.registry.getToolNames().length;
+  }
+
+  // 已连接 MCP 服务数
+  get mcpCount(): number {
+    return this.mcpManager?.clientCount ?? 0;
+  }
+
+  // 可用 Skill 数
+  get skillCount(): number {
+    return this.skillRegistry.getSummaries().length;
+  }
+
+  // 已激活 Skill 数
+  get activeSkillCount(): number {
+    return this.skillRegistry.getActiveSkillBodies().length;
+  }
+
+  // 可用 Agent 角色数
+  get agentRoleCount(): number {
+    return this.agentRoleRegistry.list().length;
+  }
+
   // 设置人在回路回调（由 TUI 注入）
   setHumanInTheLoop(callback: HumanInTheLoopCallback): void {
     this.humanInTheLoop = callback;
@@ -427,7 +462,7 @@ export class ChatService {
 
     // 构建 AgentLoop 配置
     const agentConfig: AgentLoopConfig = {
-      maxRounds: this.maxRounds,
+      maxRounds: this._maxRounds,
       mode: this.mode,
       permissionMode: this.permissionMode,
       humanInTheLoop: this.humanInTheLoop,

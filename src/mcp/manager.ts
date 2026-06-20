@@ -87,6 +87,11 @@ export class ConnectionManager {
     );
   }
 
+  // 已连接数量
+  get clientCount(): number {
+    return this.clients.size;
+  }
+
   // disconnectAll —— 依次断开所有连接
   async disconnectAll(): Promise<void> {
     for (const [name, client] of this.clients) {
