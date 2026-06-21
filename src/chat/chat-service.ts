@@ -596,7 +596,7 @@ export class ChatService {
 
     const job: MemoryExtractionJob = {
       sessionId: basename(this.historyPath, ".jsonl"),
-      turnRange: { start: prevCount, end: this.messages.length },
+      turnRange: { start: Math.max(0, prevCount - 1), end: this.messages.length },
       projectRoot,
       existingMemoryIndex: existingIndex,
       triggeredAt: new Date().toISOString(),
