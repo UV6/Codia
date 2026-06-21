@@ -172,6 +172,7 @@ export function App({ service }: AppProps) {
     },
 
     setPermissionMode(newPerm: PermissionMode): void {
+      process.stderr.write(`[App.setPermissionMode] newPerm=${newPerm}\n`);
       service.setPermissionMode(newPerm);
       setPermMode(newPerm);
     },

@@ -50,6 +50,7 @@ export function InfoBar({
   agentRoleCount,
   sessionFile,
 }: InfoBarProps) {
+  process.stderr.write(`[InfoBar render] permMode="${permMode}", status="${getStatusConfig(permMode).label}"\n`);
   const status = getStatusConfig(permMode);
 
   return (

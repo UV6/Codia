@@ -9,6 +9,7 @@ import { permissionCommand } from "./permission.js";
 import { statusCommand } from "./status.js";
 import { acceptsEditCommand } from "./acceptsedit.js";
 import { defaultCommand } from "./default.js";
+import { bypassCommand } from "./bypass.js";
 import type { CommandDef } from "../types.js";
 import type { SkillSummary } from "../../skill/types.js";
 
@@ -25,6 +26,7 @@ const NON_SKILL_COMMANDS: CommandDef[] = [
   statusCommand,
   acceptsEditCommand,
   defaultCommand,
+  bypassCommand,
 ];
 
 // buildSkillCommands —— 从 Skill 摘要列表生成 CommandDef
