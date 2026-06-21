@@ -54,7 +54,7 @@ export function InfoBar({
   const status = getStatusConfig(permMode);
   const borderColor = status.color;
   const { stdout } = useStdout();
-  const cols = stdout?.columns ?? 80;
+  const cols = Math.floor((stdout?.columns ?? 80) * 0.9);
 
   return (
     <Box flexDirection="column" width="100%" marginTop={0}>
