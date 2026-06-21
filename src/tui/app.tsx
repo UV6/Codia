@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Box, Text } from "ink";
 import { useInput } from "ink";
 import { basename } from "node:path";
-import { appendFileSync } from "node:fs";
 import { InputBox } from "./input-box.js";
 import { ChatView } from "./chat-view.js";
 import { ThinkingBox } from "./thinking-box.js";
@@ -173,10 +172,8 @@ export function App({ service }: AppProps) {
     },
 
     setPermissionMode(newPerm: PermissionMode): void {
-      appendFileSync("/tmp/codia-debug.log", `[App setPermissionMode] newPerm=${newPerm}, calling setPermMode...\n`);
       service.setPermissionMode(newPerm);
       setPermMode(newPerm);
-      appendFileSync("/tmp/codia-debug.log", `[App setPermissionMode] setPermMode called\n`);
     },
 
     getTokenUsage() {
