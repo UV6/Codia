@@ -1,7 +1,6 @@
 import { Text, Box } from "ink";
 
 interface InfoBarProps {
-  mode: "full" | "plan";
   model: string;
   usage?: { inputTokens: number; outputTokens: number };
   streaming: boolean;
@@ -17,10 +16,27 @@ interface InfoBarProps {
   sessionFile: string;
 }
 
+// statusConfig —— 权限模式 → 显示配置
+interface StatusConfig {
+  label: string;
+  color: string;
+}
+function getStatusConfig(permMode: string): StatusConfig {
+  switch (permMode) {
+    case "bypassPermissions":
+      return { label: "⚠ 危险模式", color: "red" };
+    case "plan":
+      return { label: "📋 PLAN", color: "blue" };
+    case "acceptEdits":
+      return { label: "✏️ ACCEPT_EDITS", color: "magenta" };
+    default:
+      return { label: "⬡ DEFAULT", color: "green" };
+  }
+}
+
 // InfoBar —— 底部固定信息栏，始终展示对话运行时状态
-// 替代原来的 StatusBar，信息更全面，放在输入框下方
+// 只有上下边框，无左右边框
 export function InfoBar({
-  mode,
   model,
   usage,
   streaming,
@@ -35,20 +51,17 @@ export function InfoBar({
   agentRoleCount,
   sessionFile,
 }: InfoBarProps) {
-  const modeLabel = mode === "plan" ? "PLAN" : "DEFAULT";
+  const status = getStatusConfig(permMode);
+  const borderColor = status.color;
 
   return (
-    <Box
-      borderStyle="round"
-      borderColor="green"
-      flexDirection="column"
-      paddingX={1}
-      width="100%"
-      marginTop={0}
-    >
-      {/* 第一行：会话状态 */}
-      <Box flexDirection="row">
-        <Text color="yellow">⬡ {modeLabel}</Text>
+    <Box flexDirection="column" width="100%" marginTop={0}>
+      {/* 上边框 */}
+      <Text color={borderColor}>{"─".repeat(80)}</Text>
+
+      {/* 第一行：权限模式 + 模型 + 用量 */}
+      <Box flexDirection="row" paddingLeft={1}>
+        <Text color={status.color}>{status.label}</Text>
         <Text>  </Text>
         <Text color="blue">🧠 {model}</Text>
         <Text>  </Text>
@@ -67,16 +80,10 @@ export function InfoBar({
         {streaming && (
           <Text color="green">⚡ 输出中...</Text>
         )}
-        {!streaming && permMode === "bypassPermissions" && (
-          <Text color="red">⚠ 危险模式</Text>
-        )}
-        {!streaming && permMode !== "bypassPermissions" && (
-          <Text dimColor>🔒 {permMode}</Text>
-        )}
       </Box>
 
       {/* 第二行：系统状态 */}
-      <Box flexDirection="row">
+      <Box flexDirection="row" paddingLeft={1}>
         <Text dimColor>🔧 {toolCount}</Text>
         <Text>  </Text>
         <Text dimColor>🔌 MCP×{mcpCount}</Text>
@@ -93,11 +100,14 @@ export function InfoBar({
       </Box>
 
       {/* 第三行：快捷键提示 */}
-      <Box>
+      <Box paddingLeft={1}>
         <Text color="grey" dimColor>
           ⌨ Ctrl+C 取消 | Ctrl+T 折叠思考 | /status 查看状态 | /session 会话信息
         </Text>
       </Box>
+
+      {/* 下边框 */}
+      <Text color={borderColor}>{"─".repeat(80)}</Text>
     </Box>
   );
 }

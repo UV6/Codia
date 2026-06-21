@@ -302,7 +302,6 @@ export function App({ service }: AppProps) {
       />
 
       <InfoBar
-        mode={mode}
         model={service.currentModel}
         usage={usage ?? undefined}
         streaming={isStreaming}
