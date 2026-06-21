@@ -15,6 +15,7 @@ import { dispatch } from "../command/dispatcher.js";
 import { getBuiltinCommands } from "../command/builtin/index.js";
 import { setCommandProvider } from "../command/builtin/help.js";
 import { setSessionInfoProvider } from "../command/builtin/session.js";
+import { setPermissionInfoProvider } from "../command/builtin/permission.js";
 import type { UIContext } from "../command/types.js";
 
 interface AppProps {
@@ -72,6 +73,19 @@ export function App({ service }: AppProps) {
       return lines.join("\n");
     });
   }, [service, mode]);
+
+  // 注入权限信息供 /permission 使用
+  useEffect(() => {
+    setPermissionInfoProvider(() => {
+      const labels: Record<string, string> = {
+        bypassPermissions: "⚠ 危险模式 (bypassPermissions) — 跳过所有确认",
+        plan: "📋 PLAN — 只读工具",
+        acceptsEdit: "✏️ ACCEPT_EDITS — AI 可编辑文件",
+        default: "⬡ DEFAULT — 正常权限检查",
+      };
+      return `权限模式: ${labels[permMode] ?? permMode}`;
+    });
+  }, [permMode]);
 
   // AI 对话提交（不经命令分流，供 prompt 型命令和普通对话使用）
   const handleAISubmit = useCallback(async (text: string) => {
