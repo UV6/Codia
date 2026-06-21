@@ -20,9 +20,16 @@ export interface AgentLoopYamlConfig {
   maxRounds?: number; // 默认 20
 }
 
+// MemoryConfig —— memory 配置段
+export interface MemoryConfig {
+  model?: string;    // 记忆提取专用模型，不配则用主模型
+  enabled?: boolean; // 是否启用自动记忆，默认 true
+}
+
 // AppConfig —— 完整应用配置
 export interface AppConfig extends ChatConfig {
   agentLoop: AgentLoopYamlConfig;
+  memory: MemoryConfig;
   mcp?: { servers: Record<string, Record<string, unknown>> }; // mcp_servers 段原始值，不做展开（展开在 mcp/config.ts 中）
   coordinator?: { enabled: boolean }; // Coordinator 模式能力开关
 }
@@ -98,11 +105,22 @@ export function loadAppConfig(path: string = DEFAULT_CONFIG_PATH): AppConfig {
   // 解析 mcp_servers 段（原始值，展开和合并在 mcp/config.ts 中处理）
   const mcpServers = parsed.mcp_servers as Record<string, Record<string, unknown>> | undefined;
 
+  // 解析 memory 段
+  const memoryRaw = (parsed.memory as Record<string, unknown>) ?? {};
+  const memory: MemoryConfig = {};
+  if (typeof memoryRaw.model === "string") {
+    memory.model = memoryRaw.model;
+  }
+  if (typeof memoryRaw.enabled === "boolean") {
+    memory.enabled = memoryRaw.enabled;
+  }
+
   return {
     ...chatConfig,
     agentLoop: {
       maxRounds: typeof agentLoop.max_rounds === "number" ? agentLoop.max_rounds : undefined,
     },
+    memory,
     mcp: mcpServers ? { servers: mcpServers } : undefined,
   };
 }
