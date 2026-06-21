@@ -1,4 +1,4 @@
-import { Text, Box } from "ink";
+import { Text, Box, useStdout } from "ink";
 
 interface InfoBarProps {
   model: string;
@@ -53,11 +53,13 @@ export function InfoBar({
 }: InfoBarProps) {
   const status = getStatusConfig(permMode);
   const borderColor = status.color;
+  const { stdout } = useStdout();
+  const cols = stdout?.columns ?? 80;
 
   return (
     <Box flexDirection="column" width="100%" marginTop={0}>
       {/* 上边框 */}
-      <Text color={borderColor}>{"─".repeat(80)}</Text>
+      <Text color={borderColor}>{"─".repeat(cols)}</Text>
 
       {/* 第一行：权限模式 + 模型 + 用量 */}
       <Box flexDirection="row" paddingLeft={1}>
@@ -107,7 +109,7 @@ export function InfoBar({
       </Box>
 
       {/* 下边框 */}
-      <Text color={borderColor}>{"─".repeat(80)}</Text>
+      <Text color={borderColor}>{"─".repeat(cols)}</Text>
     </Box>
   );
 }
