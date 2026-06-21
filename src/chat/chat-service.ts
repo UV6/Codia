@@ -479,6 +479,11 @@ export class ChatService {
     }
   }
 
+  // setPermissionMode —— 独立切换权限模式（供 /acceptsedit 等命令调用）
+  setPermissionMode(mode: PermissionMode): void {
+    this.permissionMode = mode;
+  }
+
   // compact —— 手动触发上下文压缩（供 /compact 命令调用）
   compact(): void {
     const signal = new AbortController().signal;

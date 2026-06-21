@@ -11,6 +11,7 @@ export interface UIContext {
   clearMessages(): void;
   setMode(mode: "full" | "plan"): void;
   getMode(): "full" | "plan";
+  setPermissionMode(mode: import("../permission/types.js").PermissionMode): void;
   getTokenUsage(): { inputTokens: number; outputTokens: number; model: string } | null;
   triggerCompact(): void;
   refreshStatus(): void;

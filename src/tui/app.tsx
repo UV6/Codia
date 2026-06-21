@@ -8,7 +8,7 @@ import { ThinkingBox } from "./thinking-box.js";
 import { InfoBar } from "./info-bar.js";
 import type { Message } from "../provider/types.js";
 import type { ChatService } from "../chat/chat-service.js";
-import type { HumanChoice, HumanPrompt } from "../permission/types.js";
+import type { HumanChoice, HumanPrompt, PermissionMode } from "../permission/types.js";
 import { CommandRegistry } from "../command/registry.js";
 import { parseCommand } from "../command/parser.js";
 import { dispatch } from "../command/dispatcher.js";
@@ -32,6 +32,7 @@ export function App({ service }: AppProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
   const [mode, setModeState] = useState<"full" | "plan">(service.currentMode);
+  const [permMode, setPermMode] = useState<PermissionMode>(service.currentPermissionMode);
   const [currentRound, setCurrentRound] = useState(0);
 
   // 权限确认状态
@@ -163,10 +164,16 @@ export function App({ service }: AppProps) {
     setMode(newMode: "full" | "plan"): void {
       service.setMode(newMode);
       setModeState(newMode);
+      setPermMode(service.currentPermissionMode);
     },
 
     getMode(): "full" | "plan" {
       return mode;
+    },
+
+    setPermissionMode(newPerm: PermissionMode): void {
+      service.setPermissionMode(newPerm);
+      setPermMode(newPerm);
     },
 
     getTokenUsage() {
@@ -308,7 +315,7 @@ export function App({ service }: AppProps) {
         messageCount={service.history.length}
         currentRound={currentRound}
         maxRounds={service.maxRounds}
-        permissionMode={service.currentPermissionMode}
+        permissionMode={permMode}
         toolCount={service.toolCount}
         mcpCount={service.mcpCount}
         skillCount={service.skillCount}
