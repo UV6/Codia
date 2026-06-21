@@ -27,7 +27,7 @@ function getStatusConfig(permMode: string): StatusConfig {
       return { label: "⚠ 危险模式", color: "red" };
     case "plan":
       return { label: "📋 PLAN", color: "blue" };
-    case "acceptEdits":
+    case "acceptsEdit":
       return { label: "✏️ ACCEPT_EDITS", color: "magenta" };
     default:
       return { label: "⬡ DEFAULT", color: "green" };
