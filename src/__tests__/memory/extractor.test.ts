@@ -187,7 +187,7 @@ describe("extractFromTurn", () => {
     cleanup();
   });
 
-  it("当 provider 抛出错误时不应崩溃", async () => {
+  it("当 provider 抛出错误时应向上传播", async () => {
     setup();
     const provider = makeErrorProvider();
     const job = makeJob({ projectRoot });

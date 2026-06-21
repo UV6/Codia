@@ -96,7 +96,7 @@ export function loadAppConfig(path: string = DEFAULT_CONFIG_PATH): AppConfig {
   try {
     raw = readFileSync(path, "utf-8");
   } catch {
-    return { ...chatConfig, agentLoop: {} };
+    return { ...chatConfig, agentLoop: {}, memory: {} };
   }
 
   const parsed = parse(raw) as Record<string, unknown>;
