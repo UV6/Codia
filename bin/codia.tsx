@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import { parseArgs } from "node:util";
-import { basename } from "node:path";
+
 import { render } from "ink";
 import { loadAppConfig, ConfigError } from "../src/config/index.js";
 import { ChatService } from "../src/chat/chat-service.js";
@@ -98,9 +98,6 @@ async function main() {
     permissionMode,
   });
 
-  if (!sessionId) {
-    console.log(`新会话：${basename(service.sessionPath, ".jsonl")}`);
-  }
 
   process.on("exit", () => {
     service.cancel();
