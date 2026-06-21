@@ -62,7 +62,7 @@ export function InfoBar({
         <Text>  </Text>
         {usage ? (
           <Text color="orange">
-            📊 入:{formatTokens(usage.inputTokens)} 出:{formatTokens(usage.outputTokens)}
+            📊 in:{formatTokens(usage.inputTokens)} out:{formatTokens(usage.outputTokens)}
           </Text>
         ) : (
           <Text dimColor>📊 --</Text>
