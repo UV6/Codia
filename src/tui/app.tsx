@@ -27,7 +27,7 @@ export function App({ service }: AppProps) {
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [streamingThinking, setStreamingThinking] = useState<string>("");
   const [thinkingCollapsed, setThinkingCollapsed] = useState(false);
-  const [usage, setUsage] = useState<{ inputTokens: number; outputTokens: number; model: string } | null>(null);
+  const [usage, setUsage] = useState<{ inputTokens: number; outputTokens: number; model: string }>({ inputTokens: 0, outputTokens: 0, model: "" });
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
@@ -81,7 +81,6 @@ export function App({ service }: AppProps) {
     setStreamingContent("");
     setStreamingThinking("");
     setToolStatus(null);
-    setUsage(null);
     setThinkingCollapsed(false);
     setIsStreaming(true);
     setCurrentRound(0);
@@ -109,7 +108,11 @@ export function App({ service }: AppProps) {
             setStreamingThinking(fullThinking);
             break;
           case "usage":
-            setUsage(chunk.usage);
+            setUsage((prev) => ({
+              inputTokens: prev.inputTokens + chunk.usage.inputTokens,
+              outputTokens: prev.outputTokens + chunk.usage.outputTokens,
+              model: chunk.usage.model,
+            }));
             break;
           case "tool_status":
             setToolStatus(`🔧 ${chunk.name} ${chunk.param}`);
@@ -200,10 +203,6 @@ export function App({ service }: AppProps) {
     service.setHumanInTheLoop(humanInTheLoop);
   }, [service, humanInTheLoop]);
 
-  // 订阅用量回调
-  useEffect(() => {
-    service.onUsage = (u) => setUsage(u);
-  }, [service]);
 
   // 权限确认按键处理（只在权限弹窗激活时）
   useInput((input, key) => {

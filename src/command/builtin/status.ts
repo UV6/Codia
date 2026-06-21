@@ -9,11 +9,9 @@ function handleStatus(_args: string, ui: UIContext): void {
     `模式: [${modeLabel}]`,
   ];
 
-  if (usage) {
+  if (usage && (usage.inputTokens > 0 || usage.outputTokens > 0)) {
     lines.push(`模型: ${usage.model}`);
-    lines.push(`输入 Token: ${usage.inputTokens}`);
-    lines.push(`输出 Token: ${usage.outputTokens}`);
-    lines.push(`总 Token: ${usage.inputTokens + usage.outputTokens}`);
+    lines.push(`输入: ${usage.inputTokens} | 输出: ${usage.outputTokens}`);
   } else {
     lines.push("Token: 暂无用量数据");
   }
