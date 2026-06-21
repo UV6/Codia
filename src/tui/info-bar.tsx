@@ -62,10 +62,10 @@ export function InfoBar({
         <Text>  </Text>
         {usage ? (
           <Text color="orange">
-            📊 {formatTokens(usage.inputTokens)}/{formatTokens(usage.outputTokens)}
+            📊 {formatTokens(usage.inputTokens + usage.outputTokens)}
           </Text>
         ) : (
-          <Text dimColor>📊 --/--</Text>
+          <Text dimColor>📊 --</Text>
         )}
         <Text>  </Text>
         <Text dimColor>💬 {messageCount}</Text>
