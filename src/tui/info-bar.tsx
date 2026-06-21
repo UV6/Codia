@@ -67,7 +67,10 @@ export function InfoBar({
         {streaming && (
           <Text color="green">⚡ 输出中...</Text>
         )}
-        {!streaming && (
+        {!streaming && permMode === "bypassPermissions" && (
+          <Text color="red">⚠ 危险模式</Text>
+        )}
+        {!streaming && permMode !== "bypassPermissions" && (
           <Text dimColor>🔒 {permMode}</Text>
         )}
       </Box>
