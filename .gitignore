@@ -14,3 +14,7 @@ sessions/
 .codegraph/daemon.sock
 .claude/worktrees/
 .claude/settings.local.json
+.claude/
+
+/memory/
+files/
