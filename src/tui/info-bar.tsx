@@ -1,4 +1,4 @@
-import { Text, Box, useStdout } from "ink";
+import { Text, Box } from "ink";
 
 interface InfoBarProps {
   model: string;
@@ -35,7 +35,6 @@ function getStatusConfig(permMode: string): StatusConfig {
 }
 
 // InfoBar —— 底部固定信息栏，始终展示对话运行时状态
-// 只有上下边框，无左右边框
 export function InfoBar({
   model,
   usage,
@@ -52,15 +51,9 @@ export function InfoBar({
   sessionFile,
 }: InfoBarProps) {
   const status = getStatusConfig(permMode);
-  const borderColor = status.color;
-  const { stdout } = useStdout();
-  const cols = Math.floor((stdout?.columns ?? 80) * 0.9);
 
   return (
     <Box flexDirection="column" width="100%" marginTop={0}>
-      {/* 上边框 */}
-      <Text color={borderColor}>{"─".repeat(cols)}</Text>
-
       {/* 第一行：权限模式 + 模型 + 用量 */}
       <Box flexDirection="row" paddingLeft={1}>
         <Text color={status.color}>{status.label}</Text>
@@ -107,9 +100,6 @@ export function InfoBar({
           ⌨ Ctrl+C 取消 | Ctrl+T 折叠思考 | /status 查看状态 | /session 会话信息
         </Text>
       </Box>
-
-      {/* 下边框 */}
-      <Text color={borderColor}>{"─".repeat(cols)}</Text>
     </Box>
   );
 }
