@@ -1,4 +1,5 @@
 import { Text, Box } from "ink";
+import { appendFileSync } from "node:fs";
 
 interface InfoBarProps {
   model: string;
@@ -50,6 +51,7 @@ export function InfoBar({
   agentRoleCount,
   sessionFile,
 }: InfoBarProps) {
+  appendFileSync("/tmp/codia-debug.log", `[InfoBar render] permMode="${permMode}" statusLabel="${getStatusConfig(permMode).label}"\n`);
   const status = getStatusConfig(permMode);
 
   return (
