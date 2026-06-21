@@ -36,7 +36,7 @@ import { loadMcpConfig } from "../mcp/config.js";
 import { buildNewSessionContext, buildResumeContext } from "../bootstrap/context-builder.js";
 import type { BootstrapContext } from "../bootstrap/types.js";
 import { extractFromTurn } from "../memory/extractor.js";
-import type { MemoryIndexBundle } from "../memory/types.js";
+import type { MemoryExtractionJob, MemoryIndexBundle } from "../memory/types.js";
 import { loadIndexes } from "../memory/store.js";
 import { SkillRegistry } from "../skill/registry.js";
 import { SkillActivator } from "../skill/activator.js";
@@ -594,20 +594,36 @@ export class ChatService {
       existingIndex = { project: [], user: [] };
     }
 
+    const job: MemoryExtractionJob = {
+      sessionId: basename(this.historyPath, ".jsonl"),
+      turnRange: { start: prevCount, end: this.messages.length },
+      projectRoot,
+      existingMemoryIndex: existingIndex,
+      triggeredAt: new Date().toISOString(),
+    };
+
+    // 用独立的 AbortController，不跟主对话共享
+    const signal = new AbortController().signal;
+
     // 异步提炼，不阻塞主路径
     extractFromTurn(
-      {
-        sessionId: basename(this.historyPath, ".jsonl"),
-        turnRange: { start: prevCount, end: this.messages.length },
-        projectRoot,
-        existingMemoryIndex: existingIndex,
-        triggeredAt: new Date().toISOString(),
-      },
+      job,
       this.messages,
-    ).catch((e) => {
-      // 记忆提炼失败只记日志，不阻塞
-      console.warn("[MemoryExtractor] 提炼失败：", (e as Error).message);
-    });
+      this.provider,
+      this.config,
+      signal,
+    )
+      .then(({ upserted, deleted }) => {
+        if (upserted.length > 0) {
+          console.log(`[MemoryExtractor] 提炼记忆 ${upserted.length} 条：${upserted.map((n) => n.title).join(", ")}`);
+        }
+        if (deleted.length > 0) {
+          console.log(`[MemoryExtractor] 删除记忆 ${deleted.length} 条：${deleted.join(", ")}`);
+        }
+      })
+      .catch((e) => {
+        console.warn("[MemoryExtractor] 提炼失败：", (e as Error).message);
+      });
   }
 
   cancel(): void {
