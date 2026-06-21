@@ -3,39 +3,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, rmSync } from "node:fs";
 import { extractFromTurn } from "../../memory/extractor.js";
-import { listNotes } from "../../memory/store.js";
-import type { MemoryExtractionJob } from "../../memory/types.js";
+import { upsertNote, listNotes } from "../../memory/store.js";
+import type { MemoryExtractionJob, MemoryNote } from "../../memory/types.js";
 import type { LLMProvider, ChatConfig, Message, Chunk } from "../../provider/types.js";
 
-// 创建模拟 Provider，通过 tool_use chunk 返回记忆操作
-function makeMemoryProvider(
-  toolCalls: Array<{ name: string; input: Record<string, unknown> }>,
-): LLMProvider {
+// 创建模拟 Provider，通过 text chunk 返回 JSON 记忆操作
+function makeTextProvider(jsonOutput: string): LLMProvider {
   async function* stream(): AsyncIterable<Chunk> {
-    for (const call of toolCalls) {
-      yield {
-        type: "tool_use",
-        call: {
-          id: `toolu_${Math.random().toString(36).slice(2, 8)}`,
-          name: call.name,
-          input: call.input,
-        },
-      };
+    if (jsonOutput) {
+      yield { type: "text", content: jsonOutput };
     }
     yield { type: "done" };
   }
 
-  return {
-    name: "mock",
-    streamChat: vi.fn().mockImplementation(() => stream()),
-  };
-}
-
-// 创建模拟 Provider，返回空（不调用任何 tool）
-function makeEmptyProvider(): LLMProvider {
-  async function* stream(): AsyncIterable<Chunk> {
-    yield { type: "done" };
-  }
   return {
     name: "mock",
     streamChat: vi.fn().mockImplementation(() => stream()),
@@ -84,7 +64,7 @@ const messages: Message[] = [
   },
 ];
 
-describe("extractFromTurn", () => {
+describe("extractFromTurn (text JSON)", () => {
   const projectRoot = join(tmpdir(), "codia-memory-ext-test");
 
   function cleanup() {
@@ -95,20 +75,23 @@ describe("extractFromTurn", () => {
     mkdirSync(projectRoot, { recursive: true });
   }
 
-  it("当 LLM 调用 memory_upsert 时应写入笔记", async () => {
+  it("当 LLM 输出 upsert JSON 时应写入笔记", async () => {
     setup();
-    const provider = makeMemoryProvider([
-      {
-        name: "memory_upsert",
-        input: {
-          category: "user_preference",
-          title: "用中文写 commit message",
-          summary: "每次开发完用中文写 commit message",
-          body: "用户要求每次功能开发完成后用中文编写 git commit message。",
-          reason: "用户明确表达的偏好",
-        },
-      },
-    ]);
+    const jsonOutput = `一些分析文本…
+
+\`\`\`json
+[
+  {
+    "action": "upsert",
+    "category": "user_preference",
+    "title": "用中文写 commit message",
+    "summary": "每次开发完用中文写 commit message",
+    "body": "用户要求每次功能开发完成后用中文编写 git commit message。",
+    "reason": "用户明确表达的偏好"
+  }
+]
+\`\`\``;
+    const provider = makeTextProvider(jsonOutput);
     const job = makeJob({ projectRoot });
 
     const result = await extractFromTurn(
@@ -131,12 +114,16 @@ describe("extractFromTurn", () => {
     cleanup();
   });
 
-  it("当对话没有可复用内容时 LLM 不调用工具", async () => {
+  it("当对话没有可复用内容时 LLM 输出空数组", async () => {
     setup();
-    const provider = makeEmptyProvider();
+    const jsonOutput = `没有值得记录的内容。
+
+\`\`\`json
+[]
+\`\`\``;
+    const provider = makeTextProvider(jsonOutput);
     const job = makeJob({ projectRoot });
 
-    // 用无意义的对话
     const trivialMessages: Message[] = [
       { role: "user", content: "今天天气怎么样？", timestamp: new Date().toISOString() },
       { role: "assistant", content: "不知道。", timestamp: new Date().toISOString() },
@@ -153,26 +140,42 @@ describe("extractFromTurn", () => {
     expect(result.upserted.length).toBe(0);
     expect(result.deleted.length).toBe(0);
 
-    // 确认没有写入
     const notes = listNotes("project", projectRoot);
     expect(notes.length).toBe(0);
 
     cleanup();
   });
 
-  it("当 LLM 调用 memory_delete 时应删除已有笔记", async () => {
+  it("当 LLM 输出 delete JSON 时应删除已有笔记", async () => {
     setup();
-    const provider = makeMemoryProvider([
-      {
-        name: "memory_delete",
-        input: {
-          id: "pref-1234567890-old",
-          reason: "用户已明确推翻之前的偏好",
-        },
-      },
-    ]);
+    // 先创建一条笔记
+    const existingNote: MemoryNote = {
+      id: "pref-1234567890-old",
+      scope: "project",
+      category: "user_preference",
+      title: "旧偏好",
+      summary: "旧的偏好",
+      body: "旧的偏好内容",
+      sourceSessionId: "old-session",
+      updatedAt: new Date().toISOString(),
+    };
+    upsertNote(existingNote, projectRoot);
 
+    // 确认笔记已存在
+    expect(listNotes("project", projectRoot).length).toBe(1);
+
+    const jsonOutput = `\`\`\`json
+[
+  {
+    "action": "delete",
+    "id": "pref-1234567890-old",
+    "reason": "用户已明确推翻之前的偏好"
+  }
+]
+\`\`\``;
+    const provider = makeTextProvider(jsonOutput);
     const job = makeJob({ projectRoot });
+
     const result = await extractFromTurn(
       job,
       messages,
@@ -196,7 +199,6 @@ describe("extractFromTurn", () => {
       extractFromTurn(job, messages, provider, mockConfig, new AbortController().signal),
     ).rejects.toThrow("network error");
 
-    // 确认没有写入
     const notes = listNotes("project", projectRoot);
     expect(notes.length).toBe(0);
 
