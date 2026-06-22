@@ -42,11 +42,11 @@ describe("parseHighlightedLine", () => {
     expect(segments).toEqual([]);
   });
 
-  it("未知 class 的 span 渲染为无颜色", () => {
+  it("未知 class 的 span 降级为白色", () => {
     const segments = parseHighlightedLine(
       '<span class="unknown-class">text</span>',
     );
-    expect(segments).toEqual([{ text: "text" }]);
+    expect(segments).toEqual([{ text: "text", color: "white" }]);
   });
 
   it("hljs-string 映射为绿色", () => {
@@ -65,5 +65,39 @@ describe("parseHighlightedLine", () => {
     expect(segments).toEqual([
       { text: "// comment", color: "grey" },
     ]);
+  });
+
+  it("&amp; &lt; &gt; &quot; HTML 实体解码", () => {
+    const segments = parseHighlightedLine(
+      '<span class="hljs-string">"x &lt; 10 &amp;&amp; y &gt; 5"</span>',
+    );
+    expect(segments).toEqual([
+      { text: '"x < 10 && y > 5"', color: "green" },
+    ]);
+  });
+
+  // 核心 case：嵌套 span 不会导致外层标签原样输出
+  it("嵌套 span 正确提取所有文本，不残留 HTML 标签", () => {
+    const segments = parseHighlightedLine(
+      '<span class="hljs-strong">**粗体 <span class="hljs-emphasis">*斜体*</span> 混合**</span>',
+    );
+    // 不应出现任何含 <span 的 segment
+    const hasHtml = segments.some((s) => s.text.includes("<span"));
+    expect(hasHtml).toBe(false);
+    // 所有文本拼接回来与原文语义一致
+    const combined = segments.map((s) => s.text).join("");
+    expect(combined).toBe("**粗体 *斜体* 混合**");
+  });
+
+  it("三层嵌套也不残留 HTML 标签", () => {
+    const segments = parseHighlightedLine(
+      '<span class="hljs-strong">**<span class="hljs-emphasis">*<span class="hljs-code">code</span>*</span>**</span>',
+    );
+    const hasHtml = segments.some((s) => s.text.includes("<span"));
+    expect(hasHtml).toBe(false);
+    const combined = segments.map((s) => s.text).join("");
+    expect(combined).toBe("***code***");
+    // Note: inner-most text takes precedence; since hljs-emphasis and hljs-strong
+    // both map to white, the visible result is consistent
   });
 });

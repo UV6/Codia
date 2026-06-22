@@ -41,34 +41,88 @@ const CLASS_COLOR_MAP: Record<string, string> = {
   "hljs-property": "cyan",
   "hljs-operator": "white",
   "hljs-punctuation": "white",
+  // markdown 专用
+  "hljs-strong": "white",
+  "hljs-emphasis": "white",
+  "hljs-link": "blue",
+  "hljs-code": "yellow",
+  "hljs-bullet": "yellow",
+  "hljs-quote": "grey",
+  "hljs-formula": "white",
 };
 
-// 解析单行 highlight.js HTML，提取带颜色的文本段
+// 解析单行 highlight.js HTML 为带颜色的文本段
+// 用栈支持嵌套 <span>，避免内层 span 打破外层解析
 export function parseHighlightedLine(line: string): Segment[] {
   if (!line) return [];
 
   const segments: Segment[] = [];
-  const regex = /<span class="([^"]*)">([^<]*)<\/span>/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+  const spanTagRe = /<span class="([^"]*)">/;
+  const closeTag = "</span>";
+  const stack: string[] = []; // 颜色栈，最内层在栈顶
+  let chars = "";
+  let i = 0;
 
-  while ((match = regex.exec(line)) !== null) {
-    // span 前的纯文本
-    if (match.index > lastIndex) {
-      segments.push({ text: line.slice(lastIndex, match.index) });
+  while (i < line.length) {
+    const rest = line.slice(i);
+
+    // 匹配开标签
+    const openMatch = rest.match(spanTagRe);
+    if (openMatch && openMatch.index === 0) {
+      // 先提交当前累积的文本
+      if (chars) {
+        const color = stack.length > 0 ? stack[stack.length - 1] : undefined;
+        segments.push({ text: chars, color });
+        chars = "";
+      }
+      const classes = openMatch[1].split(" ");
+      const color = classes.map((c) => CLASS_COLOR_MAP[c]).find(Boolean);
+      stack.push(color || "white");
+      i += openMatch[0].length;
+      continue;
     }
 
-    // 取第一个匹配的颜色 class
-    const classes = match[1].split(" ");
-    const color = classes.map((c) => CLASS_COLOR_MAP[c]).find(Boolean);
-    segments.push({ text: match[2], color });
+    // 匹配闭标签
+    if (rest.startsWith(closeTag)) {
+      if (chars) {
+        const color = stack.length > 0 ? stack[stack.length - 1] : undefined;
+        segments.push({ text: chars, color });
+        chars = "";
+      }
+      stack.pop();
+      i += closeTag.length;
+      continue;
+    }
 
-    lastIndex = match.index + match[0].length;
+    // &amp; → &, &lt; → <, &gt; → >, &quot; → "
+    if (rest.startsWith("&amp;")) {
+      chars += "&";
+      i += 5;
+      continue;
+    }
+    if (rest.startsWith("&lt;")) {
+      chars += "<";
+      i += 4;
+      continue;
+    }
+    if (rest.startsWith("&gt;")) {
+      chars += ">";
+      i += 4;
+      continue;
+    }
+    if (rest.startsWith("&quot;")) {
+      chars += '"';
+      i += 6;
+      continue;
+    }
+
+    chars += line[i];
+    i++;
   }
 
-  // 尾部纯文本
-  if (lastIndex < line.length) {
-    segments.push({ text: line.slice(lastIndex) });
+  // 残余文本
+  if (chars) {
+    segments.push({ text: chars });
   }
 
   return segments.length > 0 ? segments : [{ text: line }];
