@@ -8,11 +8,10 @@ interface StartupBannerProps {
 
 // Codia 卡通鱼图案 — "cod" fish + 终端 >_ 提示符元素
 const LOGO_LINES = [
-  "  ╭───────────╮",
-  " ╱  ●       ●  ╲",
-  "│       ▽       │",
-  " ╲     ═══    ╱",
-  "  ╰───────────╯",
+  "     ♕     ",
+  "  ▐▛███▜▌  ",
+  " ▝▜█████▛▘  ",
+  "   ▘▘ ▝▝    ",
 ];
 
 // StartupBanner — 启动时展示 Codia 卡通形象 + 版本/模型/目录
