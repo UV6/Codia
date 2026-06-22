@@ -6,6 +6,8 @@ import { InputBox } from "./input-box.js";
 import { ChatView } from "./chat-view.js";
 import { ThinkingBox } from "./thinking-box.js";
 import { InfoBar } from "./info-bar.js";
+import { StartupBanner } from "./startup-banner.js";
+import pkg from "../../package.json" with { type: "json" };
 import type { Message } from "../provider/types.js";
 import type { ChatService } from "../chat/chat-service.js";
 import type { HumanChoice, HumanPrompt, PermissionMode } from "../permission/types.js";
@@ -286,6 +288,15 @@ export function App({ service }: AppProps) {
         streamingContent={streamingContent}
         toolStatus={toolStatus}
       />
+
+      {/* 启动横幅：无历史消息时展示 */}
+      {messages.length === 0 && !streamingContent && (
+        <StartupBanner
+          version={pkg.version}
+          model={service.currentModel}
+          cwd={process.cwd()}
+        />
+      )}
 
       {/* 权限确认弹窗 */}
       {permissionPrompt && (
