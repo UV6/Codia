@@ -289,14 +289,12 @@ export function App({ service }: AppProps) {
         toolStatus={toolStatus}
       />
 
-      {/* 启动横幅：无历史消息时展示 */}
-      {messages.length === 0 && !streamingContent && (
-        <StartupBanner
-          version={pkg.version}
-          model={service.currentModel}
-          cwd={process.cwd()}
-        />
-      )}
+      {/* 启动横幅：整个会话期间始终展示 */}
+      <StartupBanner
+        version={pkg.version}
+        model={service.currentModel}
+        cwd={process.cwd()}
+      />
 
       {/* 权限确认弹窗 */}
       {permissionPrompt && (
