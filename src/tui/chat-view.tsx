@@ -1,5 +1,6 @@
 import { Text, Box } from "ink";
 import type { Message } from "../provider/types.js";
+import { MarkdownRenderer } from "./markdown-renderer.js";
 
 interface ChatViewProps {
   messages: Message[];
@@ -26,7 +27,7 @@ export function ChatView({ messages, streamingContent, toolStatus }: ChatViewPro
         if (msg.role === "assistant") {
           return (
             <Box key={i} marginTop={1} flexDirection="column">
-              <Text color="green">{msg.content}</Text>
+              <MarkdownRenderer text={msg.content} />
               {msg.thinking && (
                 <Box marginTop={1}>
                   <Text color="grey" italic>
@@ -56,7 +57,7 @@ export function ChatView({ messages, streamingContent, toolStatus }: ChatViewPro
       {/* 流式渲染中的内容 */}
       {streamingContent && (
         <Box marginTop={messages.length > 0 ? 0 : 0}>
-          <Text color="green">{streamingContent}</Text>
+          <MarkdownRenderer text={streamingContent} isStreaming={true} />
         </Box>
       )}
     </Box>
