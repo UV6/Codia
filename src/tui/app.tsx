@@ -283,17 +283,17 @@ export function App({ service }: AppProps) {
 
   return (
     <Box flexDirection="column" padding={1}>
-      <ChatView
-        messages={messages}
-        streamingContent={streamingContent}
-        toolStatus={toolStatus}
-      />
-
-      {/* 启动横幅：整个会话期间始终展示 */}
+      {/* 启动横幅：整个会话期间始终展示在顶部 */}
       <StartupBanner
         version={pkg.version}
         model={service.currentModel}
         cwd={process.cwd()}
+      />
+
+      <ChatView
+        messages={messages}
+        streamingContent={streamingContent}
+        toolStatus={toolStatus}
       />
 
       {/* 权限确认弹窗 */}
