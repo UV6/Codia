@@ -1,0 +1,19 @@
+# Codia 项目级 MCP Server 配置
+# 格式：mcp_servers:
+#         <server-name>:
+#           type: stdio | http
+#           command: <可执行文件或命令>   # stdio 专用
+#           args: [<arg1>, <arg2>, ...]  # stdio 专用
+#           env:                         # stdio 专用，支持 ${VAR} 展开
+#             KEY: value
+#           url: <http-url>              # http 专用
+#           headers:                     # http 专用
+#             Header-Name: value
+
+mcp_servers:
+  context7:
+    type: stdio
+    command: npx
+    args:
+      - "-y"
+      - "@upstash/context7-mcp@latest"

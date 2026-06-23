@@ -1,5 +1,5 @@
 import type { Message, ChatConfig, LLMProvider } from "../provider/types.js";
-import type { ToolContext } from "../tool/types.js";
+import type { ToolContext, ToolCall } from "../tool/types.js";
 import type { ToolRegistry } from "../tool/registry.js";
 import { StreamCollector } from "./stream-collector.js";
 import { ToolScheduler } from "./tool-scheduler.js";
@@ -17,6 +17,24 @@ import type {
 
 // DEFAULT_MAX_ROUNDS —— 默认迭代上限
 export const DEFAULT_MAX_ROUNDS = 20;
+
+// buildInputPreview —— 从工具名和参数中提取展示用简短描述
+function buildInputPreview(name: string, input: Record<string, unknown>): string {
+  switch (name) {
+    case "read_file":
+    case "write_file":
+    case "edit_file":
+      return typeof input.filePath === "string" ? input.filePath : "";
+    case "glob":
+      return typeof input.pattern === "string" ? input.pattern : "";
+    case "grep":
+      return typeof input.pattern === "string" ? input.pattern : "";
+    case "run_command":
+      return typeof input.command === "string" ? input.command.slice(0, 80) : "";
+    default:
+      return "";
+  }
+}
 
 // AgentLoop —— ReAct 模式的核心循环
 // 驱动 "调用 LLM → 收集响应 → 判断停止 → 分批执行工具 → 结果回灌 → 下一轮"
@@ -233,14 +251,21 @@ export class AgentLoop {
 
       // 10. 工具结果回灌到消息历史（所有结果合并为一条 user 消息）
       if (toolResults.length > 0) {
+        // 构建 callId → ToolCall 查找表，提取展示用参数
+        const callMap = new Map(result.toolCalls.map((c) => [c.id, c]));
         const combinedMsg: Message = {
           role: "user",
           content: processedResults.map((r) => r.content).join("\n\n"),
           timestamp: new Date().toISOString(),
-          toolResults: toolResults.map((r, i) => ({
-            toolUseId: r.callId,
-            result: processedResults[i],
-          })),
+          toolResults: toolResults.map((r, i) => {
+            const call = callMap.get(r.callId);
+            return {
+              toolUseId: r.callId,
+              name: r.name,
+              result: processedResults[i],
+              inputPreview: call ? buildInputPreview(r.name, call.input) : undefined,
+            };
+          }),
         };
         messages.push(combinedMsg);
       }

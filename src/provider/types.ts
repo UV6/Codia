@@ -22,7 +22,13 @@ export interface Message {
   toolCalls?: ToolCall[]; // assistant 消息可能含工具调用
   toolResult?: ToolResult; // user-like 消息含单个工具执行结果（兼容旧格式）
   toolUseId?: string; // 关联单个 tool_result 和 tool_use（兼容旧格式）
-  toolResults?: Array<{ toolUseId: string; result: ToolResult }>; // 同轮多个工具结果
+  // 同轮多个工具结果（含展示用 name 和 inputPreview，旧消息兼容无 name）
+  toolResults?: Array<{
+    toolUseId: string;
+    name?: string; // 工具名，用于 TUI 摘要展示
+    result: ToolResult;
+    inputPreview?: string; // 展示用简短描述（如文件路径、搜索模式等）
+  }>;
 }
 
 // Chunk —— Provider 流式输出的最小单元

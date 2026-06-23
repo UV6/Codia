@@ -43,6 +43,9 @@ export function App({ service }: AppProps) {
   // 用 ref 存储 resolve 回调，避免放到 state 里
   const permissionResolveRef = useRef<((choice: HumanChoice) => void) | null>(null);
 
+  // 工具结果展开/折叠状态
+  const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
+
   // 人在回路回调：设置状态 + 返回 Promise
   const humanInTheLoop = useCallback((prompt: HumanPrompt): Promise<HumanChoice> => {
     return new Promise<HumanChoice>((resolve) => {
@@ -243,7 +246,7 @@ export function App({ service }: AppProps) {
     }
   });
 
-  // Ctrl+C / Ctrl+T
+  // Ctrl+C / Ctrl+T / Ctrl+E
   useInput((input, key) => {
     if (permissionPrompt) return; // 权限弹窗激活时不响应其他按键
     if (key.ctrl && input === "c" && isStreaming) {
@@ -251,6 +254,21 @@ export function App({ service }: AppProps) {
     }
     if (key.ctrl && input === "t") {
       setThinkingCollapsed((prev) => !prev);
+    }
+    if (key.ctrl && input === "e") {
+      setExpandedTools((prev) => {
+        // 全部展开 → 全部折叠；否则全部展开
+        if (prev.size > 0) return new Set();
+        const allIds = new Set<string>();
+        for (const msg of service.history) {
+          if (msg.toolResults) {
+            for (const tr of msg.toolResults) {
+              allIds.add(tr.toolUseId);
+            }
+          }
+        }
+        return allIds;
+      });
     }
   });
 
@@ -294,6 +312,7 @@ export function App({ service }: AppProps) {
         messages={messages}
         streamingContent={streamingContent}
         toolStatus={toolStatus}
+        expandedTools={expandedTools}
       />
 
       {/* 权限确认弹窗 */}

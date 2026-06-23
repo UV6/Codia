@@ -152,6 +152,8 @@ describe("AgentLoop", () => {
     expect(messages[0].toolCalls).toHaveLength(1);
     expect(messages[1].role).toBe("user");
     expect(messages[1].toolResults).toHaveLength(1);
+    expect(messages[1].toolResults![0].name).toBe("read_file");
+    expect(messages[1].toolResults![0].inputPreview).toBe("a.txt");
     expect(messages[2].role).toBe("assistant");
     expect(messages[2].content).toBe("Done reading!");
   });

@@ -6,12 +6,8 @@ dist/
 codia.yaml
 .DS_Store
 sessions/
-.codegraph/codegraph.db
-.codegraph/codegraph.db-shm
-.codegraph/codegraph.db-wal
-.codegraph/daemon.log
-.codegraph/daemon.pid
-.codegraph/daemon.sock
+.codegraph/
+
 .claude/worktrees/
 .claude/settings.local.json
 .claude/
@@ -19,3 +15,4 @@ sessions/
 /memory/
 files/
 .superpowers/
+.understand-anything/
