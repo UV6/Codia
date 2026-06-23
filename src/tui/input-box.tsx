@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Text, Box, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { CommandRegistry } from "../command/registry.js";
@@ -9,13 +9,17 @@ interface InputBoxProps {
   disabled: boolean;
   error?: string;
   registry?: CommandRegistry;
+  onToggleThinking?: () => void;
+  onToggleTools?: () => void;
 }
 
 // InputBox —— 用户输入区域，类似 Claude Code 的 "Codia >" 前缀
-export function InputBox({ onSubmit, disabled, error, registry }: InputBoxProps) {
+export function InputBox({ onSubmit, disabled, error, registry, onToggleThinking, onToggleTools }: InputBoxProps) {
   const [value, setValue] = useState("");
   const [completions, setCompletions] = useState<string[]>([]);
   const [showGrouped, setShowGrouped] = useState(false);
+  // 标记 Ctrl 修饰键已被拦截，阻止 TextInput 将其写入输入框
+  const suppressChangeRef = useRef(false);
 
   const handleSubmit = (text: string) => {
     if (!text.trim()) return;
@@ -23,6 +27,15 @@ export function InputBox({ onSubmit, disabled, error, registry }: InputBoxProps)
     setCompletions([]);
     setShowGrouped(false);
     onSubmit(text);
+  };
+
+  // 包装 setValue：当 suppressChangeRef 标记时跳过，阻止 Ctrl+字母 写入输入框
+  const handleChange = (newValue: string) => {
+    if (suppressChangeRef.current) {
+      suppressChangeRef.current = false;
+      return;
+    }
+    setValue(newValue);
   };
 
   // 输入 / 后自动展示匹配的命令、Skill 和模式
@@ -67,8 +80,20 @@ export function InputBox({ onSubmit, disabled, error, registry }: InputBoxProps)
     }
   }, [value, disabled, registry]);
 
-  // Tab 补全：单匹配直接补全，多匹配不做操作（已由自动提示展示）
+  // Tab 补全 + 全局快捷键
   useInput((input, key) => {
+    // 全局快捷键（不受 disabled 限制），设置 ref 阻止 TextInput 写入字符
+    if (key.ctrl && input === "t") {
+      suppressChangeRef.current = true;
+      onToggleThinking?.();
+      return;
+    }
+    if (key.ctrl && input === "e") {
+      suppressChangeRef.current = true;
+      onToggleTools?.();
+      return;
+    }
+
     if (disabled || !registry) return;
 
     if (key.tab && !key.ctrl && !key.meta) {
@@ -107,7 +132,7 @@ export function InputBox({ onSubmit, disabled, error, registry }: InputBoxProps)
         {disabled ? (
           <Text dimColor>...</Text>
         ) : (
-          <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
+          <TextInput value={value} onChange={handleChange} onSubmit={handleSubmit} />
         )}
       </Box>
     </Box>

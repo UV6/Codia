@@ -252,29 +252,12 @@ export function App({ service }: AppProps) {
     }
   });
 
-  // Ctrl+C / Ctrl+T / Ctrl+E
+  // Ctrl+C
+  // 注意：Ctrl+T/Ctrl+E 在 InputBox 中处理（避免被 TextInput 拦截）
   useInput((input, key) => {
     if (permissionPrompt) return; // 权限弹窗激活时不响应其他按键
     if (key.ctrl && input === "c" && isStreaming) {
       service.cancel();
-    }
-    if (key.ctrl && input === "t") {
-      setThinkingCollapsed((prev) => !prev);
-    }
-    if (key.ctrl && input === "e") {
-      setExpandedTools((prev) => {
-        // 全部展开 → 全部折叠；否则全部展开
-        if (prev.size > 0) return new Set();
-        const allIds = new Set<string>();
-        for (const msg of service.history) {
-          if (msg.toolResults) {
-            for (const tr of msg.toolResults) {
-              allIds.add(tr.toolUseId);
-            }
-          }
-        }
-        return allIds;
-      });
     }
   });
 
@@ -353,6 +336,21 @@ export function App({ service }: AppProps) {
         disabled={isStreaming || !!permissionPrompt}
         error={error ?? undefined}
         registry={registry}
+        onToggleThinking={() => setThinkingCollapsed((prev) => !prev)}
+        onToggleTools={() =>
+          setExpandedTools((prev) => {
+            if (prev.size > 0) return new Set();
+            const allIds = new Set<string>();
+            for (const msg of service.history) {
+              if (msg.toolResults) {
+                for (const tr of msg.toolResults) {
+                  allIds.add(tr.toolUseId);
+                }
+              }
+            }
+            return allIds;
+          })
+        }
       />
 
       <InfoBar
