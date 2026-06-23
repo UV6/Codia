@@ -114,11 +114,17 @@ export function App({ service }: AppProps) {
 
     let fullContent = "";
     let fullThinking = "";
+    let thinkingAutoCollapsed = false;
 
     try {
       for await (const chunk of service.sendMessage(text)) {
         switch (chunk.type) {
           case "text":
+            // 思考完成后自动折叠，腾出视野给回答
+            if (fullThinking && !thinkingAutoCollapsed) {
+              setThinkingCollapsed(true);
+              thinkingAutoCollapsed = true;
+            }
             fullContent += chunk.content;
             setStreamingContent(fullContent);
             break;
