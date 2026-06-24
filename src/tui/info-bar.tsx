@@ -14,6 +14,8 @@ interface InfoBarProps {
   activeSkillCount: number;
   agentRoleCount: number;
   sessionFile: string;
+  contextTokens: number;
+  contextMax: number;
 }
 
 // statusConfig —— 权限模式 → 显示配置
@@ -49,6 +51,8 @@ export function InfoBar({
   activeSkillCount,
   agentRoleCount,
   sessionFile,
+  contextTokens,
+  contextMax,
 }: InfoBarProps) {
   const status = getStatusConfig(permMode);
 
@@ -67,6 +71,8 @@ export function InfoBar({
         ) : (
           <Text dimColor>📊 --</Text>
         )}
+        <Text>  </Text>
+        <Text dimColor>📐 {formatTokens(contextTokens)}/{formatTokens(contextMax)}</Text>
         <Text>  </Text>
         <Text dimColor>💬 {messageCount}</Text>
         <Text>  </Text>
@@ -97,7 +103,7 @@ export function InfoBar({
       {/* 第三行：快捷键提示 */}
       <Box paddingLeft={1}>
         <Text color="grey" dimColor>
-          ⌨ Ctrl+C 取消 | Ctrl+T 折叠思考 | /status 查看状态 | /session 会话信息
+          ⌨ Ctrl+C 取消 | Ctrl+T 折叠思考 | /context 查看上下文 | /session 会话信息
         </Text>
       </Box>
     </Box>

@@ -39,6 +39,8 @@ export function App({ service }: AppProps) {
   const [currentRound, setCurrentRound] = useState(0);
   const [mcpCount, setMcpCount] = useState(service.mcpCount);
   const [toolCount, setToolCount] = useState(service.toolCount);
+  const [contextTokens, setContextTokens] = useState(0);
+  const [contextMax, setContextMax] = useState(200_000);
 
   // 权限确认状态
   const [permissionPrompt, setPermissionPrompt] = useState<HumanPrompt | null>(null);
@@ -230,8 +232,19 @@ export function App({ service }: AppProps) {
       // MCP 连接完成后刷新计数，确保 InfoBar 展示正确的 MCP×N
       setMcpCount(service.mcpCount);
       setToolCount(service.toolCount);
+      // 刷新上下文估算
+      const ctx = service.getContextInfo();
+      setContextTokens(ctx.estimatedTokens);
+      setContextMax(ctx.maxTokens);
     });
   }, [service]);
+
+  // 消息变化时刷新上下文估算
+  useEffect(() => {
+    const ctx = service.getContextInfo();
+    setContextTokens(ctx.estimatedTokens);
+    setContextMax(ctx.maxTokens);
+  }, [messages]);
 
   // 注入回调到 ChatService
   useEffect(() => {
@@ -377,6 +390,8 @@ export function App({ service }: AppProps) {
         activeSkillCount={service.activeSkillCount}
         agentRoleCount={service.agentRoleCount}
         sessionFile={basename(service.sessionPath)}
+        contextTokens={contextTokens}
+        contextMax={contextMax}
       />
     </Box>
   );
