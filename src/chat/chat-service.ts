@@ -484,6 +484,15 @@ export class ChatService {
     this.permissionMode = mode;
   }
 
+  // 上下文信息（供 /context 命令使用）
+  getContextInfo(): { estimatedTokens: number; messageCount: number; maxTokens: number } {
+    return {
+      estimatedTokens: this.contextManager.estimateTokens(this.messages),
+      messageCount: this.messages.length,
+      maxTokens: this.contextManager.contextWindow,
+    };
+  }
+
   // compact —— 手动触发上下文压缩（供 /compact 命令调用）
   compact(): void {
     const signal = new AbortController().signal;

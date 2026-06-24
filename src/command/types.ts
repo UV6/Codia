@@ -15,6 +15,7 @@ export interface UIContext {
   getTokenUsage(): { inputTokens: number; outputTokens: number; model: string } | null;
   triggerCompact(): void;
   refreshStatus(): void;
+  getContextInfo(): { estimatedTokens: number; messageCount: number; maxTokens: number };
 }
 
 // CommandHandler —— 命令处理函数签名

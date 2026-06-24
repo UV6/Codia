@@ -218,6 +218,10 @@ export function App({ service }: AppProps) {
       // 强制触发状态栏刷新（通过更新 mode state 的引用）
       setModeState((prev) => prev);
     },
+
+    getContextInfo() {
+      return service.getContextInfo();
+    },
   }), [service, handleAISubmit, mode, usage]);
 
   // MCP 初始化（仅首次挂载时执行）

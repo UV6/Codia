@@ -7,6 +7,7 @@ import { sessionCommand } from "./session.js";
 import { memoryCommand } from "./memory.js";
 import { permissionCommand } from "./permission.js";
 import { statusCommand } from "./status.js";
+import { contextCommand } from "./context.js";
 import { acceptsEditCommand } from "./acceptsedit.js";
 import { defaultCommand } from "./default.js";
 import { bypassCommand } from "./bypass.js";
@@ -24,6 +25,7 @@ const NON_SKILL_COMMANDS: CommandDef[] = [
   memoryCommand,
   permissionCommand,
   statusCommand,
+  contextCommand,
   acceptsEditCommand,
   defaultCommand,
   bypassCommand,

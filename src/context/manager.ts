@@ -39,6 +39,16 @@ export class ContextManager {
   }
 
   // setAnchor —— 每次 API 返回后更新 token 估算锚点
+  // getContextWindow —— 返回上下文窗口上限
+  get contextWindow(): number {
+    return CONTEXT_WINDOW;
+  }
+
+  // estimateTokens —— 估算当前消息数组的 token 数
+  estimateTokens(messages: Message[]): number {
+    return this.estimator.estimate(messages);
+  }
+
   setAnchor(usage: { inputTokens: number }, messageCount: number): void {
     this.estimator.setAnchor(usage, messageCount);
   }
