@@ -34,6 +34,7 @@ export function App({ service }: AppProps) {
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [compressHint, setCompressHint] = useState<string | null>(null);
   const [mode, setModeState] = useState<"full" | "plan">(service.currentMode);
   const [permMode, setPermMode] = useState<PermissionMode>(service.currentPermissionMode);
   const [currentRound, setCurrentRound] = useState(0);
@@ -104,6 +105,7 @@ export function App({ service }: AppProps) {
     setStreamingContent("");
     setStreamingThinking("");
     setToolStatus(null);
+    setCompressHint(null);
     setThinkingCollapsed(false);
     setIsStreaming(true);
     setCurrentRound(0);
@@ -155,6 +157,11 @@ export function App({ service }: AppProps) {
             break;
           case "round_start":
             setCurrentRound(chunk.round);
+            break;
+          case "compress":
+            if (chunk.savedTokens) {
+              setCompressHint(`📦 上下文压缩完成，节省 ${(chunk.savedTokens / 1000).toFixed(1)}K token`);
+            }
             break;
           case "stopped":
             // AgentLoop 停止后从 service 同步完整消息历史
@@ -355,6 +362,12 @@ export function App({ service }: AppProps) {
 
       {streamingThinking && (
         <ThinkingBox thinking={streamingThinking} collapsed={thinkingCollapsed} />
+      )}
+
+      {compressHint && (
+        <Box paddingLeft={1} paddingTop={0}>
+          <Text color="magenta">{compressHint}</Text>
+        </Box>
       )}
 
       <InputBox

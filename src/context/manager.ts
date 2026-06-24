@@ -5,8 +5,8 @@ import { TokenEstimator } from "./token-estimator.js";
 import { HeavyCompressor } from "./heavy-compressor.js";
 import { compressBatch } from "./light-compressor.js";
 
-// 自动触发安全余量：13K
-const AUTO_SAFETY_MARGIN = 13_000;
+// 自动触发安全余量：13K（测试用临时降低）
+const AUTO_SAFETY_MARGIN = 195_000;
 
 // 手动触发保留余量：3K
 const MANUAL_KEEP_MARGIN = 3_000;
