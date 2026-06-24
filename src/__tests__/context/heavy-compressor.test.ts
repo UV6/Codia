@@ -104,6 +104,42 @@ describe("splitMessages", () => {
     // system 消息不参与计算，但会被包含在 old 中
     expect(recent.length).toBeGreaterThanOrEqual(3);
   });
+
+  it("不切断 tool_use ↔ tool_result 配对", () => {
+    // 场景：toolCallMsg(assistant with toolCalls) 在 old 中，但
+    // toolResultMsg(user with toolResults) 被留在了 recent
+    // 修复后 toolCallMsg 应被拉入 recent
+
+    const msg1: Message = makeMsg("user", "开始");
+    const msg2: Message = makeMsg("assistant", "好的");
+    const toolCallMsg: Message = {
+      role: "assistant",
+      content: "我来查",
+      timestamp: new Date().toISOString(),
+      toolCalls: [{ id: "call_abc", name: "read_file", input: { path: "/tmp/test" } }],
+    };
+    const toolResultMsg: Message = {
+      role: "user",
+      content: "结果",
+      timestamp: new Date().toISOString(),
+      toolResults: [{ toolUseId: "call_abc", name: "read_file", result: { status: "success", content: "" } }],
+    };
+    const followUp: Message = makeMsg("assistant", "完成了");
+
+    // 每条消息约 2-3 个 token（chars/4），total ≈ 11 tokens
+    // keepTokens=2：当扫描到 toolResultMsg 时刚好满足阈值，切在 index=3
+    // 此时 toolCallMsg 在 old 中 → 触发修复
+    const messages: Message[] = [msg1, msg2, toolCallMsg, toolResultMsg, followUp];
+    const estimator = new TokenEstimator();
+
+    const { old, recent } = splitMessages(messages, estimator, 2, 1);
+
+    // 修复后：toolCallMsg 被拉回 recent，确保 call_abc 的 tool_use ↔ tool_result 配对完整
+    const callInRecent = recent.some(
+      (m) => m.toolCalls?.some((tc) => tc.id === "call_abc"),
+    );
+    expect(callInRecent).toBe(true);
+  });
 });
 
 describe("HeavyCompressor", () => {
