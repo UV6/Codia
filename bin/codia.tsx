@@ -103,8 +103,32 @@ async function main() {
     service.cancel();
   });
 
+  // 包装 stdout，将 RIS (c, 终端重置) 替换为仅擦除可见屏幕，
+  // 保留终端回滚缓冲区，避免重启 Codia 后之前的对话内容被清空
+  const rawWrite = process.stdout.write.bind(process.stdout);
+  const stdout = new Proxy(process.stdout, {
+    get(target, prop, receiver) {
+      if (prop === "write") {
+        return function (
+          chunk: any,
+          encoding?: any,
+          callback?: (error?: Error | null) => void,
+        ): boolean {
+          if (typeof chunk === "string") {
+            // c → [2J[H：仅清除可见屏幕但不擦除回滚历史
+            chunk = chunk.replace(/c/g, "[2J[H");
+          }
+          return rawWrite(chunk, encoding, callback);
+        };
+      }
+      const value = Reflect.get(target, prop, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as typeof process.stdout;
+
   const { waitUntilExit } = render(<App service={service} />, {
     exitOnCtrlC: true,
+    stdout,
   });
 
   await waitUntilExit();

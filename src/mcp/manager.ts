@@ -11,12 +11,8 @@ export class ConnectionManager {
   async connectAll(config: McpConfig, registry: ToolRegistry): Promise<void> {
     const entries = Object.entries(config.servers);
     if (entries.length === 0) {
-      console.log("[MCP] 未配置 MCP Server，跳过");
       return;
     }
-
-    console.log(`[MCP] 开始连接 ${entries.length} 个 MCP Server...`);
-    const startTime = Date.now();
 
     const results = await Promise.allSettled(
       entries.map(async ([name, serverConfig]) => {
@@ -48,9 +44,6 @@ export class ConnectionManager {
           // 成功则缓存 client
           this.clients.set(name, client);
 
-          console.log(
-            `[MCP] ${name}: 已连接，注册 ${registered} 个工具`,
-          );
           return { name, success: true, toolCount: registered };
         } catch (e) {
           console.error(
@@ -74,17 +67,12 @@ export class ConnectionManager {
         r.status === "rejected" ||
         (r.status === "fulfilled" && !r.value.success),
     );
-    const totalTools = succeeded.reduce(
-      (sum, r) => sum + r.value.toolCount,
-      0,
-    );
-
-    console.log(
-      `[MCP] 连接完成：${succeeded.length}/${entries.length} 成功，注册 ${totalTools} 个工具（${Date.now() - startTime}ms）` +
-        (failed.length > 0
-          ? `，${failed.length} 个失败`
-          : ""),
-    );
+    // 连接完成（成功/失败统计已通过 InfoBar 的 mcpCount 体现）
+    if (failed.length > 0) {
+      console.error(
+        `[MCP] ${failed.length}/${entries.length} 个 Server 连接失败`,
+      );
+    }
   }
 
   // 已连接数量
@@ -97,7 +85,6 @@ export class ConnectionManager {
     for (const [name, client] of this.clients) {
       try {
         await client.disconnect();
-        console.log(`[MCP] ${name}: 已断开`);
       } catch (e) {
         console.error(
           `[MCP] ${name}: 断开时出错 — ${(e as Error).message}`,

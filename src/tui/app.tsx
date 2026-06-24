@@ -37,6 +37,8 @@ export function App({ service }: AppProps) {
   const [mode, setModeState] = useState<"full" | "plan">(service.currentMode);
   const [permMode, setPermMode] = useState<PermissionMode>(service.currentPermissionMode);
   const [currentRound, setCurrentRound] = useState(0);
+  const [mcpCount, setMcpCount] = useState(service.mcpCount);
+  const [toolCount, setToolCount] = useState(service.toolCount);
 
   // 权限确认状态
   const [permissionPrompt, setPermissionPrompt] = useState<HumanPrompt | null>(null);
@@ -220,7 +222,11 @@ export function App({ service }: AppProps) {
 
   // MCP 初始化（仅首次挂载时执行）
   useEffect(() => {
-    service.init();
+    service.init().then(() => {
+      // MCP 连接完成后刷新计数，确保 InfoBar 展示正确的 MCP×N
+      setMcpCount(service.mcpCount);
+      setToolCount(service.toolCount);
+    });
   }, [service]);
 
   // 注入回调到 ChatService
@@ -361,8 +367,8 @@ export function App({ service }: AppProps) {
         currentRound={currentRound}
         maxRounds={service.maxRounds}
         permissionMode={permMode}
-        toolCount={service.toolCount}
-        mcpCount={service.mcpCount}
+        toolCount={toolCount}
+        mcpCount={mcpCount}
         skillCount={service.skillCount}
         activeSkillCount={service.activeSkillCount}
         agentRoleCount={service.agentRoleCount}

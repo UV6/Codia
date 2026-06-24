@@ -40,15 +40,8 @@ export class McpClient {
         },
       })) as { protocolVersion: string; capabilities: unknown; serverInfo: unknown };
 
-      console.log(
-        `[MCP] ${this.serverName}: 已连接 ${initResult.serverInfo ? `(${JSON.stringify(initResult.serverInfo)})` : ""}，协议版本 ${initResult.protocolVersion}`,
-      );
-
       // 4. 发送 initialized 通知
       await this.rpc.sendNotification("notifications/initialized");
-
-      // 5. 获取工具列表
-      await this.fetchTools();
 
       this._connected = true;
     } catch (e) {
@@ -110,9 +103,6 @@ export class McpClient {
       tools: McpToolDef[];
     };
     this.tools = result.tools ?? [];
-    console.log(
-      `[MCP] ${this.serverName}: 已连接，注册 ${this.tools.length} 个工具`,
-    );
   }
 
   // createTransport —— 根据配置类型创建传输层
