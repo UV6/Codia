@@ -239,12 +239,15 @@ export function App({ service }: AppProps) {
     });
   }, [service]);
 
-  // 消息变化时刷新上下文估算
+  // 消息或流式内容变化时刷新上下文估算
   useEffect(() => {
     const ctx = service.getContextInfo();
-    setContextTokens(ctx.estimatedTokens);
+    // 流式输出中的文本尚未写入 messages，需额外估算
+    const streamingEstimate = Math.ceil(streamingContent.length / 4)
+      + Math.ceil(streamingThinking.length / 4);
+    setContextTokens(ctx.estimatedTokens + streamingEstimate);
     setContextMax(ctx.maxTokens);
-  }, [messages]);
+  }, [messages, streamingContent, streamingThinking]);
 
   // 注入回调到 ChatService
   useEffect(() => {
