@@ -152,7 +152,7 @@ export function listSessions(projectRoot?: string): SessionSummary[] {
   if (!existsSync(dir)) return [];
   try {
     const files = collectSessionFiles(dir)
-      .sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+      .sort((a, b) => b.stat.mtime.getTime() - a.stat.mtime.getTime());
     return files.map((f) => {
       const messages = loadHistory(f.path);
       const firstUser = messages.find((m) => m.role === "user");
