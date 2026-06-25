@@ -635,6 +635,11 @@ export class ChatService {
   // scheduleMemoryExtraction —— 自然结束后异步提炼记忆
   private scheduleMemoryExtraction(prevCount: number): void {
     const projectRoot = process.cwd();
+
+    // 预检：本轮对话是否包含四类记忆的信号，没有则跳过 LLM 调用
+    const turnMessages = this.messages.slice(Math.max(0, prevCount - 1));
+    if (!hasMemorySignal(turnMessages)) return;
+
     // 读取已有索引
     let existingIndex: MemoryIndexBundle;
     try {
@@ -706,4 +711,55 @@ export class ChatService {
 
     return info.join("\n");
   }
+}
+
+// hasMemorySignal —— 预检本轮对话是否包含四类记忆信号
+// 用轻量规则快速判断，避免无意义的 LLM 调用
+const MEMORY_SIGNALS: Record<string, RegExp[]> = {
+  user_preference: [
+    /以后.{0,4}(不要|别|记得|每次|总是|永远)/,
+    /偏好|习惯|喜欢|希望.{0,4}(这样|那样|用|做)/,
+    /每次.{0,4}都/,
+    /记住|记下|记着/,
+    /从今以后|接下来.{0,4}都/,
+  ],
+  correction_feedback: [
+    /不对|错了|不是.{0,4}这样|搞错了/,
+    /纠正|更正|改正/,
+    /应该是|应当是/,
+    /为什么.{0,6}(不行|不对|出错|报错)/,
+    /你.{0,4}(理解错|搞错|弄错)/,
+  ],
+  project_knowledge: [
+    /架构|技术栈|技术选型|依赖.{0,2}(关系|注入)/,
+    /命名.{0,2}(约定|规范|规则)/,
+    /代码规范|编码规范|风格指南/,
+    /文件.{0,2}(结构|组织|命名|放置)/,
+    /项目.{0,2}(结构|组织|约定|配置)/,
+    /组件.{0,2}(拆分|划分|层次)/,
+    /commit.{0,2}(规范|格式|约定)/,
+  ],
+  reference_material: [
+    /https?:\/\/\S+/,
+    /文档.{0,2}(链接|地址|参考)/,
+    /参考.{0,2}(资料|链接|文档|文章)/,
+    /查一下|搜一下|看一下.{0,4}(文档|资料)/,
+  ],
+};
+
+function hasMemorySignal(messages: Message[]): boolean {
+  const userText = messages
+    .filter((m) => m.role === "user")
+    .map((m) => typeof m.content === "string" ? m.content : JSON.stringify(m.content))
+    .join("\n");
+
+  if (!userText) return false;
+
+  for (const patterns of Object.values(MEMORY_SIGNALS)) {
+    for (const re of patterns) {
+      if (re.test(userText)) return true;
+    }
+  }
+
+  return false;
 }
