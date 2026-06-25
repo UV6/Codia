@@ -302,15 +302,39 @@ export class ChatService {
     setMemoryInfoProvider(() => {
       const projectNotes = listNotes("project", projectRoot);
       const userNotes = listNotes("user", projectRoot);
-      const projectCount = projectNotes.length;
-      const userCount = userNotes.length;
-      if (projectCount === 0 && userCount === 0) {
+
+      const categoryLabel: Record<string, string> = {
+        user_preference: "用户偏好",
+        correction_feedback: "纠正反馈",
+        project_knowledge: "项目知识",
+        reference_material: "参考资料",
+      };
+
+      const formatGroup = (label: string, notes: typeof projectNotes): string => {
+        if (notes.length === 0) return "";
+        // 按分类分组
+        const groups = new Map<string, typeof notes>();
+        for (const n of notes) {
+          const cat = categoryLabel[n.category] ?? n.category;
+          if (!groups.has(cat)) groups.set(cat, []);
+          groups.get(cat)!.push(n);
+        }
+        const lines: string[] = [`📋 ${label}（${notes.length} 条）：`];
+        for (const [cat, items] of groups) {
+          for (const item of items) {
+            lines.push(`  [${cat}] ${item.title}`);
+          }
+        }
+        return lines.join("\n");
+      };
+
+      const projectText = formatGroup("项目记忆", projectNotes);
+      const userText = formatGroup("用户记忆", userNotes);
+
+      if (!projectText && !userText) {
         return "暂无记忆。Codia 会在对话中自动提炼项目知识和个人偏好。";
       }
-      const parts: string[] = [];
-      if (projectCount > 0) parts.push(`项目记忆 ${projectCount} 条`);
-      if (userCount > 0) parts.push(`用户记忆 ${userCount} 条`);
-      return parts.join("，");
+      return [projectText, userText].filter(Boolean).join("\n\n");
     });
 
     // 触发 session_start Hook（异步，不阻塞构造）
