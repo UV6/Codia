@@ -37,7 +37,8 @@ import { buildNewSessionContext, buildResumeContext } from "../bootstrap/context
 import type { BootstrapContext } from "../bootstrap/types.js";
 import { extractFromTurn } from "../memory/extractor.js";
 import type { MemoryExtractionJob, MemoryIndexBundle } from "../memory/types.js";
-import { loadIndexes } from "../memory/store.js";
+import { loadIndexes, listNotes } from "../memory/store.js";
+import { setMemoryInfoProvider } from "../command/builtin/memory.js";
 import { SkillRegistry } from "../skill/registry.js";
 import { SkillActivator } from "../skill/activator.js";
 import { toSummaries } from "../skill/loader.js";
@@ -296,6 +297,21 @@ export class ChatService {
     const basePrompt = builder.build();
     const envInfo = this.buildEnvInfo();
     this.fullSystemPrompt = envInfo ? `${basePrompt}\n\n${envInfo}` : basePrompt;
+
+    // 注册记忆信息 provider（供 /memory 命令使用）
+    setMemoryInfoProvider(() => {
+      const projectNotes = listNotes("project", projectRoot);
+      const userNotes = listNotes("user", projectRoot);
+      const projectCount = projectNotes.length;
+      const userCount = userNotes.length;
+      if (projectCount === 0 && userCount === 0) {
+        return "暂无记忆。Codia 会在对话中自动提炼项目知识和个人偏好。";
+      }
+      const parts: string[] = [];
+      if (projectCount > 0) parts.push(`项目记忆 ${projectCount} 条`);
+      if (userCount > 0) parts.push(`用户记忆 ${userCount} 条`);
+      return parts.join("，");
+    });
 
     // 触发 session_start Hook（异步，不阻塞构造）
     this.hookEngine.fire("session_start", {
