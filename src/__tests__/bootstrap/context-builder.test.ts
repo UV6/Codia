@@ -15,9 +15,9 @@ describe("context-builder", () => {
     mkdirSync(projectRoot, { recursive: true });
   }
 
-  it("新会话上下文包含指令文本（如果存在 MEWCODE.md）", () => {
+  it("新会话上下文包含指令文本（如果存在 Codia.md）", () => {
     setup();
-    writeFileSync(join(projectRoot, "MEWCODE.md"), "# Project Rules\nUse TypeScript.");
+    writeFileSync(join(projectRoot, "Codia.md"), "# Project Rules\nUse TypeScript.");
     const ctx = buildNewSessionContext({ projectRoot, now: new Date() });
     expect(ctx.instructionText).toContain("Project Rules");
     expect(ctx.recoveredMessages.length).toBe(0);
