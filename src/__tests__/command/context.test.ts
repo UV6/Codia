@@ -14,6 +14,7 @@ function makeUIContext(overrides: Partial<UIContext> = {}): UIContext {
     triggerCompact: vi.fn(),
     refreshStatus: vi.fn(),
     getContextInfo: () => ({ estimatedTokens: 0, messageCount: 0, maxTokens: 200_000 }),
+    getCwd: () => "/mock/project",
     ...overrides,
   };
 }

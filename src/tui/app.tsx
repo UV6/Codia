@@ -231,6 +231,10 @@ export function App({ service }: AppProps) {
     getContextInfo() {
       return service.getContextInfo();
     },
+
+    getCwd() {
+      return process.cwd();
+    },
   }), [service, handleAISubmit, mode, usage]);
 
   // MCP 初始化（仅首次挂载时执行）
