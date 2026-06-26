@@ -38,18 +38,24 @@ function formatDuration(ms: number): string {
 // renderToolSummary —— 根据工具名、metadata 和展示参数生成一行摘要
 function renderToolSummary(
   name: string | undefined,
+  result: ToolResult,
   metadata: ToolResult["metadata"],
   inputPreview: string | undefined,
-  status: ToolResult["status"],
 ): string {
   // 旧数据 fallback
   if (!name) return `${DEFAULT_ICON} 工具结果`;
 
   const icon = TOOL_ICONS[name] ?? DEFAULT_ICON;
   const detail = buildDetail(name, metadata);
+  const target = inputPreview || name;
 
-  if (status === "error") {
-    return `${icon} ${inputPreview || name} 执行失败${detail ? ` (${detail})` : ""}`;
+  if (result.permissionDenied) {
+    const reason = summarizeDenyReason(result.content);
+    return `${icon} ${target} 被拦截：${reason}${detail ? ` (${detail})` : ""}`;
+  }
+
+  if (result.status === "error") {
+    return `${icon} ${target} 执行失败${detail ? ` (${detail})` : ""}`;
   }
 
   switch (name) {
@@ -93,6 +99,25 @@ function buildDetail(name: string, metadata: ToolResult["metadata"]): string {
   return parts.join(", ");
 }
 
+// summarizeDenyReason —— 从权限/Hook 拒绝文案中提取摘要原因
+export function summarizeDenyReason(content: string): string {
+  const hookPrefix = "被 Hook 规则拒绝：";
+  const permissionPrefix = "权限被拒绝：";
+
+  const hookIndex = content.indexOf(hookPrefix);
+  if (hookIndex >= 0) {
+    return content.slice(hookIndex + hookPrefix.length).trim();
+  }
+
+  const permissionIndex = content.indexOf(permissionPrefix);
+  if (permissionIndex >= 0) {
+    const tail = content.slice(permissionIndex + permissionPrefix.length);
+    return tail.split("。")[0].trim() || "权限不足";
+  }
+
+  return content.trim();
+}
+
 // ChatView —— 消息列表 + 流式渲染
 export function ChatView({
   messages,
@@ -120,9 +145,9 @@ export function ChatView({
                       >
                         {renderToolSummary(
                           tr.name,
+                          tr.result,
                           tr.result.metadata,
                           tr.inputPreview,
-                          tr.result.status,
                         )}
                       </Text>
                       {isExpanded && (
