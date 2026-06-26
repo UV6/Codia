@@ -16,6 +16,7 @@ import { parseCommand } from "../command/parser.js";
 import { dispatch } from "../command/dispatcher.js";
 import { getBuiltinCommands } from "../command/builtin/index.js";
 import { setCommandProvider } from "../command/builtin/help.js";
+import { setCommandProvider as setSkillsCommandProvider } from "../command/builtin/skills.js";
 import { setSessionInfoProvider } from "../command/builtin/session.js";
 import { setPermissionInfoProvider } from "../command/builtin/permission.js";
 import type { UIContext } from "../command/types.js";
@@ -67,8 +68,9 @@ export function App({ service }: AppProps) {
     for (const cmd of commands) {
       reg.register(cmd);
     }
-    // 注入命令列表供 /help 使用
+    // 注入命令列表供 /help 和 /skills 使用
     setCommandProvider(() => reg.getAll());
+    setSkillsCommandProvider(() => reg.getAll());
     return reg;
   }, [service]);
 
