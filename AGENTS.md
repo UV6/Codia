@@ -14,3 +14,11 @@
 
 每次开发完后，AI 应主动告诉我 checklist 中哪些场景需要在终端里测试。我去测试，把结果反馈给 AI。
 
+## 提交规范
+
+开发这个仓库时，遵循 Conventional Commits 规范：
+
+1. 每次 commit 消息格式：`<type>: <描述>`
+2. `type` 使用：`fix`、`feat`、`docs`、`test`、`refactor`、`chore`、`perf`、`ci`、`build`
+3. 提交消息用中文描述
+4. 小功能开发完就提交一次，不要积累大量改动后一次性提交
