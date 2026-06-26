@@ -29,14 +29,14 @@ describe("isPathAllowed", () => {
     expect(isPathAllowed(resolve("/tmp/other-project/file.md"), opts)).toBe(false);
   });
 
-  it("allowExternalUserFile 为 true 时允许用户 .mewcode 路径", () => {
+  it("allowExternalUserFile 为 true 时允许用户 .codia 路径", () => {
     const opts = { ...DEFAULT_OPTIONS, allowExternalUserFile: true, visited: new Set() };
-    const homeDir = resolve(process.env.HOME || "/", ".mewcode");
+    const homeDir = resolve(process.env.HOME || "/", ".codia");
     expect(isPathAllowed(resolve(homeDir, "test.md"), opts)).toBe(true);
   });
 
-  it("allowExternalUserFile 为 false 时不检查用户 .mewcode", () => {
-    const homeDir = resolve(process.env.HOME || "/", ".mewcode");
+  it("allowExternalUserFile 为 false 时不检查用户 .codia", () => {
+    const homeDir = resolve(process.env.HOME || "/", ".codia");
     const opts = { ...DEFAULT_OPTIONS, allowExternalUserFile: false, visited: new Set() };
     // 用户目录不在项目根下，应被拦截
     if (!homeDir.startsWith("/tmp/test-project")) {

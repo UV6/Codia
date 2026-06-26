@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 
 import { parseArgs } from "node:util";
+import { existsSync } from "node:fs";
 
 import { render } from "ink";
 import { loadAppConfig, ConfigError } from "../src/config/index.js";
@@ -15,10 +16,10 @@ codia — 终端 AI 编程助手
 用法: codia [选项]
 
 选项:
-  --session, -s <id>     继续指定的会话
-  --sessions, -ls         列出所有历史会话
-  --bypassPermissions     启动时进入 bypassPermissions 模式（跳过权限确认，仅保留黑名单）
-  --help, -h              显示帮助信息
+  --session <id>, -s <id>  继续指定的会话
+  --sessions, -l            列出所有历史会话
+  --bypassPermissions       启动时进入 bypassPermissions 模式（跳过权限确认，仅保留黑名单）
+  --help, -h                显示帮助信息
 
 运行时命令:
   /default        切换为 default 权限模式
@@ -89,6 +90,11 @@ async function main() {
   const sessionId = typeof values.session === "string" ? values.session : undefined;
 
   if (sessionId) {
+    const sessionFile = sessionPath(sessionId);
+    if (!existsSync(sessionFile)) {
+      console.error(`会话不存在：${sessionId}`);
+      process.exit(1);
+    }
     console.log(`继续会话：${sessionId}`);
   }
 

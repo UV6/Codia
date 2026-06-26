@@ -69,36 +69,83 @@ function formatMessagesForSummary(messages: Message[]): string {
 
 // splitMessages —— 将消息切分为"待摘要"和"保留原文"两部分
 // 从尾部往回累积 token，直到达到保留量要求
+// 确保 tool_use ↔ tool_result 配对不被切断
 export function splitMessages(
   messages: Message[],
   estimator: TokenEstimator,
   keepTokens: number = KEEP_TOKENS,
   keepMinMessages: number = KEEP_MIN_MESSAGES,
 ): { old: Message[]; recent: Message[] } {
+  // 第一步：按 token 量从尾部计算初始切分点
   let accumTokens = 0;
   let recentCount = 0;
-  const recent: Message[] = [];
+  let splitIdx = messages.length; // 切分点，old = [0, splitIdx), recent = [splitIdx, end)
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.role === "system") continue;
 
-    const msgTokens = estimator.estimateTokens(msg.content || "");
-    accumTokens += msgTokens;
-    recent.unshift(msg);
+    accumTokens += estimator.estimateTokens(msg.content || "");
     recentCount++;
+    splitIdx = i;
 
-    // 满足保留量：token >= keepTokens 且条数 >= keepMinMessages
     if (accumTokens >= keepTokens && recentCount >= keepMinMessages) {
-      return {
-        old: messages.slice(0, i),
-        recent,
-      };
+      break;
     }
   }
 
-  // 消息总数不足保留量，全量保留，不摘要
-  return { old: [], recent: [...messages] };
+  // 第二步：修复 tool_use ↔ tool_result 配对
+  // recent 中的 toolResults 引用的 toolUseId 必须在 recent 中找到对应的 toolCalls
+  splitIdx = fixToolPairBoundary(messages, splitIdx);
+
+  return {
+    old: messages.slice(0, splitIdx),
+    recent: messages.slice(splitIdx),
+  };
+}
+
+// fixToolPairBoundary —— 确保 recent 中的 tool_result 引用的 tool_use 也在 recent 中
+// 从 splitIdx 向前扫描，把包含被引用 toolCalls 的消息也拉入 recent
+function fixToolPairBoundary(messages: Message[], splitIdx: number): number {
+  // 收集 recent 中所有 toolResults 引用的 toolUseId
+  const pendingIds = new Set<string>();
+  for (let i = splitIdx; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.toolResults) {
+      for (const tr of msg.toolResults) {
+        if (tr.toolUseId) pendingIds.add(tr.toolUseId);
+      }
+    }
+    if (msg.toolUseId) pendingIds.add(msg.toolUseId);
+  }
+
+  if (pendingIds.size === 0) return splitIdx;
+
+  // 从边界向前扫描，找到包含被引用 toolCalls 的消息
+  for (let j = splitIdx - 1; j >= 0 && pendingIds.size > 0; j--) {
+    const prev = messages[j];
+    if (prev.role === "system") continue;
+
+    // 检查 prev 是否包含 pending 中的 toolCall
+    const matched = (prev.toolCalls ?? []).filter((tc) => pendingIds.has(tc.id));
+    if (matched.length === 0) continue;
+
+    // 匹配到：移除已匹配的 id
+    for (const tc of matched) pendingIds.delete(tc.id);
+
+    // 把切分点移到 j，prev 纳入 recent
+    splitIdx = j;
+
+    // prev 自身可能也有 toolResults，它们引用的 toolCall 也需要在 recent 中
+    if (prev.toolResults) {
+      for (const tr of prev.toolResults) {
+        if (tr.toolUseId) pendingIds.add(tr.toolUseId);
+      }
+    }
+    if (prev.toolUseId) pendingIds.add(prev.toolUseId);
+  }
+
+  return splitIdx;
 }
 
 // HeavyCompressor —— 重量兜底压缩

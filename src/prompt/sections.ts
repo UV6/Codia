@@ -5,7 +5,7 @@ export function instructionSection(text: string): Section {
   return {
     name: "项目指令",
     priority: 0,
-    content: text ? `以下项目级别指令适用于本次会话：\n\n${text}` : "",
+    content: text ? `以下内容来自项目 Codia.md 配置文件（已按"项目根 > .codia/ > ~/.codia/"三层优先级加载拼接），是会话启动时已读取的已知上下文。后续无需再用工具搜索 Codia.md 文件来验证这些规则，直接据此回答即可。若有冲突以高优先级层为准：\n\n${text}` : "",
   };
 }
 

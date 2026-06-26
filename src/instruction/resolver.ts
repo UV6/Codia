@@ -78,7 +78,7 @@ function resolveFile(
         content: "",
         depth,
         warnings: [
-          `越界引用，已拦截：${absolutePath}（不允许访问项目目录或 mewcode 子树之外的路径）`,
+          `越界引用，已拦截：${absolutePath}（不允许访问项目目录或 codia 子树之外的路径）`,
         ],
       },
     ];
@@ -146,10 +146,10 @@ export function isPathAllowed(
   options: InstructionResolveOptions,
 ): boolean {
   const projectRoot = resolve(options.projectRoot);
-  const mewcodeDir = resolve(projectRoot, ".mewcode");
-  const userMewcode = resolve(
+  const codiaDir = resolve(projectRoot, ".codia");
+  const userCodia = resolve(
     process.env.HOME || "/",
-    ".mewcode",
+    ".codia",
   );
 
   // 允许项目根目录及其子目录
@@ -157,9 +157,9 @@ export function isPathAllowed(
     return true;
   }
 
-  // 允许用户 .mewcode 目录（仅在显式允许时）
+  // 允许用户 .codia 目录（仅在显式允许时）
   if (options.allowExternalUserFile) {
-    if (targetPath.startsWith(userMewcode + "/") || targetPath === userMewcode) {
+    if (targetPath.startsWith(userCodia + "/") || targetPath === userCodia) {
       return true;
     }
   }

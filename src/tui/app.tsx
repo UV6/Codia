@@ -34,11 +34,14 @@ export function App({ service }: AppProps) {
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const [compressHint, setCompressHint] = useState<string | null>(null);
   const [mode, setModeState] = useState<"full" | "plan">(service.currentMode);
   const [permMode, setPermMode] = useState<PermissionMode>(service.currentPermissionMode);
   const [currentRound, setCurrentRound] = useState(0);
   const [mcpCount, setMcpCount] = useState(service.mcpCount);
   const [toolCount, setToolCount] = useState(service.toolCount);
+  const [contextTokens, setContextTokens] = useState(0);
+  const [contextMax, setContextMax] = useState(200_000);
 
   // 权限确认状态
   const [permissionPrompt, setPermissionPrompt] = useState<HumanPrompt | null>(null);
@@ -102,6 +105,7 @@ export function App({ service }: AppProps) {
     setStreamingContent("");
     setStreamingThinking("");
     setToolStatus(null);
+    setCompressHint(null);
     setThinkingCollapsed(false);
     setIsStreaming(true);
     setCurrentRound(0);
@@ -153,6 +157,11 @@ export function App({ service }: AppProps) {
             break;
           case "round_start":
             setCurrentRound(chunk.round);
+            break;
+          case "compress":
+            if (chunk.savedTokens) {
+              setCompressHint(`📦 上下文压缩完成，节省 ${(chunk.savedTokens / 1000).toFixed(1)}K token`);
+            }
             break;
           case "stopped":
             // AgentLoop 停止后从 service 同步完整消息历史
@@ -230,8 +239,22 @@ export function App({ service }: AppProps) {
       // MCP 连接完成后刷新计数，确保 InfoBar 展示正确的 MCP×N
       setMcpCount(service.mcpCount);
       setToolCount(service.toolCount);
+      // 刷新上下文估算
+      const ctx = service.getContextInfo();
+      setContextTokens(ctx.estimatedTokens);
+      setContextMax(ctx.maxTokens);
     });
   }, [service]);
+
+  // 消息或流式内容变化时刷新上下文估算
+  useEffect(() => {
+    const ctx = service.getContextInfo();
+    // 流式输出中的文本尚未写入 messages，需额外估算
+    const streamingEstimate = Math.ceil(streamingContent.length / 4)
+      + Math.ceil(streamingThinking.length / 4);
+    setContextTokens(ctx.estimatedTokens + streamingEstimate);
+    setContextMax(ctx.maxTokens);
+  }, [messages, streamingContent, streamingThinking]);
 
   // 注入回调到 ChatService
   useEffect(() => {
@@ -341,6 +364,12 @@ export function App({ service }: AppProps) {
         <ThinkingBox thinking={streamingThinking} collapsed={thinkingCollapsed} />
       )}
 
+      {compressHint && (
+        <Box paddingLeft={1} paddingTop={0}>
+          <Text color="magenta">{compressHint}</Text>
+        </Box>
+      )}
+
       <InputBox
         onSubmit={handleSubmit}
         disabled={isStreaming || !!permissionPrompt}
@@ -377,6 +406,8 @@ export function App({ service }: AppProps) {
         activeSkillCount={service.activeSkillCount}
         agentRoleCount={service.agentRoleCount}
         sessionFile={basename(service.sessionPath)}
+        contextTokens={contextTokens}
+        contextMax={contextMax}
       />
     </Box>
   );

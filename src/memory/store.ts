@@ -18,7 +18,7 @@ const MAX_INDEX_BYTES = 25_000;
 export function getMemoryDir(scope: MemoryScope, projectRoot: string): string {
   if (scope === "user") {
     const home = process.env.HOME ?? "/";
-    return resolve(home, ".mewcode", "memory");
+    return resolve(home, ".codia", "memory");
   }
   return resolve(projectRoot, "memory");
 }

@@ -179,7 +179,7 @@ export function ChatView({
       {/* 工具调用状态 */}
       {toolStatus && (
         <Box marginTop={messages.length > 0 ? 1 : 0}>
-          <Text color="blue">{toolStatus}</Text>
+          <Text color="green">{toolStatus}</Text>
         </Box>
       )}
 

@@ -65,7 +65,7 @@ export class ContextManager {
     const estimatedTokens = this.estimator.estimate(messages);
 
     if (mode === "auto") {
-      const threshold = CONTEXT_WINDOW - AUTO_SAFETY_MARGIN; // 187K
+      const threshold = CONTEXT_WINDOW - AUTO_SAFETY_MARGIN; // 200K - 13K = 187K
       if (estimatedTokens < threshold) {
         return { messages, events };
       }

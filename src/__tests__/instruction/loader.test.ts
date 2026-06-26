@@ -18,7 +18,7 @@ describe("loadForProject", () => {
   function setup() {
     cleanup();
     mkdirSync(testDir, { recursive: true });
-    mkdirSync(join(testDir, ".mewcode"), { recursive: true });
+    mkdirSync(join(testDir, ".codia"), { recursive: true });
   }
 
   it("无任何指令文件时返回空结果且不报错", () => {
@@ -31,7 +31,7 @@ describe("loadForProject", () => {
 
   it("加载单个项目根指令文件", () => {
     setup();
-    writeFileSync(join(testDir, "MEWCODE.md"), "# 项目规则\n使用 TypeScript。");
+    writeFileSync(join(testDir, "Codia.md"), "# 项目规则\n使用 TypeScript。");
     const result = loadForProject(testDir);
     expect(result.text).toContain("# 项目规则");
     expect(result.documents.length).toBeGreaterThan(0);
@@ -40,9 +40,9 @@ describe("loadForProject", () => {
 
   it("三层文件都存在时按优先级拼接", () => {
     setup();
-    writeFileSync(join(testDir, "MEWCODE.md"), "# 项目根规则");
-    writeFileSync(join(testDir, ".mewcode", "MEWCODE.md"), "# 项目私有规则");
-    // 用户级测试不做文件检查（因为路径在 ~/.mewcode）
+    writeFileSync(join(testDir, "Codia.md"), "# 项目根规则");
+    writeFileSync(join(testDir, ".codia", "Codia.md"), "# 项目私有规则");
+    // 用户级测试不做文件检查（因为路径在 ~/.codia）
 
     const result = loadForProject(testDir);
     const text = result.text;
@@ -68,7 +68,7 @@ describe("loadForProject", () => {
   it("legal include 展开后的内容在拼接文本中", () => {
     setup();
     writeFileSync(join(testDir, "sub.md"), "# 被引用的子规则");
-    writeFileSync(join(testDir, "MEWCODE.md"), "@include sub.md\n# 主规则");
+    writeFileSync(join(testDir, "Codia.md"), "@include sub.md\n# 主规则");
     const result = loadForProject(testDir);
     expect(result.text).toContain("# 被引用的子规则");
     cleanup();

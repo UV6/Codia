@@ -37,7 +37,8 @@ import { buildNewSessionContext, buildResumeContext } from "../bootstrap/context
 import type { BootstrapContext } from "../bootstrap/types.js";
 import { extractFromTurn } from "../memory/extractor.js";
 import type { MemoryExtractionJob, MemoryIndexBundle } from "../memory/types.js";
-import { loadIndexes } from "../memory/store.js";
+import { loadIndexes, listNotes } from "../memory/store.js";
+import { setMemoryInfoProvider } from "../command/builtin/memory.js";
 import { SkillRegistry } from "../skill/registry.js";
 import { SkillActivator } from "../skill/activator.js";
 import { toSummaries } from "../skill/loader.js";
@@ -296,6 +297,45 @@ export class ChatService {
     const basePrompt = builder.build();
     const envInfo = this.buildEnvInfo();
     this.fullSystemPrompt = envInfo ? `${basePrompt}\n\n${envInfo}` : basePrompt;
+
+    // 注册记忆信息 provider（供 /memory 命令使用）
+    setMemoryInfoProvider(() => {
+      const projectNotes = listNotes("project", projectRoot);
+      const userNotes = listNotes("user", projectRoot);
+
+      const categoryLabel: Record<string, string> = {
+        user_preference: "用户偏好",
+        correction_feedback: "纠正反馈",
+        project_knowledge: "项目知识",
+        reference_material: "参考资料",
+      };
+
+      const formatGroup = (label: string, notes: typeof projectNotes): string => {
+        if (notes.length === 0) return "";
+        // 按分类分组
+        const groups = new Map<string, typeof notes>();
+        for (const n of notes) {
+          const cat = categoryLabel[n.category] ?? n.category;
+          if (!groups.has(cat)) groups.set(cat, []);
+          groups.get(cat)!.push(n);
+        }
+        const lines: string[] = [`📋 ${label}（${notes.length} 条）：`];
+        for (const [cat, items] of groups) {
+          for (const item of items) {
+            lines.push(`  [${cat}] ${item.title}`);
+          }
+        }
+        return lines.join("\n");
+      };
+
+      const projectText = formatGroup("项目记忆", projectNotes);
+      const userText = formatGroup("用户记忆", userNotes);
+
+      if (!projectText && !userText) {
+        return "暂无记忆。Codia 会在对话中自动提炼项目知识和个人偏好。";
+      }
+      return [projectText, userText].filter(Boolean).join("\n\n");
+    });
 
     // 触发 session_start Hook（异步，不阻塞构造）
     this.hookEngine.fire("session_start", {
@@ -595,6 +635,7 @@ export class ChatService {
   // scheduleMemoryExtraction —— 自然结束后异步提炼记忆
   private scheduleMemoryExtraction(prevCount: number): void {
     const projectRoot = process.cwd();
+
     // 读取已有索引
     let existingIndex: MemoryIndexBundle;
     try {
