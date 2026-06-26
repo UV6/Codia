@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   instructionSection,
   memorySection,
+  agentRolesSection,
 } from "../../prompt/sections.js";
 import { SystemPromptBuilder } from "../../prompt/builder.js";
 import {
@@ -41,6 +42,18 @@ describe("bootstrap prompt sections", () => {
     expect(result).toContain("用户记忆");
     expect(result).toContain("测试项目");
     expect(result).toContain("使用中文");
+  });
+
+  it("Agent 角色 section 排在身份 section 之前", () => {
+    const builder = new SystemPromptBuilder();
+    builder.add(identitySection());
+    builder.add(agentRolesSection([{ name: "Explore", description: "只读代码探索" }]));
+    const result = builder.build();
+
+    const rolesIdx = result.indexOf("当前会话可用的预定义子 Agent 角色如下");
+    const identIdx = result.indexOf("你是 Codia");
+    expect(rolesIdx).toBeLessThan(identIdx);
+    expect(result).toContain("Explore");
   });
 
   it("空记忆索引不影响正常构建", () => {

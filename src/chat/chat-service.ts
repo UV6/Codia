@@ -24,6 +24,7 @@ import {
   outputSection,
   instructionSection,
   memorySection,
+  agentRolesSection,
 } from "../prompt/sections.js";
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -287,6 +288,14 @@ export class ChatService {
     if (bootstrapContext.memoryText) {
       builder.add(memorySection(bootstrapContext.memoryText));
     }
+    builder.add(
+      agentRolesSection(
+        this.agentRoleRegistry.list().map((role) => ({
+          name: role.frontmatter.name,
+          description: role.frontmatter.description,
+        })),
+      ),
+    );
     builder.add(identitySection());
     builder.add(constraintsSection());
     builder.add(taskModeSection());

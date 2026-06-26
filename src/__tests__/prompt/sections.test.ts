@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  agentRolesSection,
   identitySection,
   constraintsSection,
   taskModeSection,
@@ -55,5 +56,18 @@ describe("Sections", () => {
   it("工具使用 section 含优先用专用工具规则", () => {
     const s = toolUseSection();
     expect(s.content).toContain("优先使用专用工具");
+  });
+
+  it("Agent 角色 section 包含预定义角色清单提示", () => {
+    const s = agentRolesSection([
+      { name: "Explore", description: "只读代码探索" },
+      { name: "Plan", description: "输出实现方案" },
+    ]);
+
+    expect(s.name).toBe("Agent 角色");
+    expect(s.priority).toBe(0.75);
+    expect(s.content).toContain("不要说没有预定义角色");
+    expect(s.content).toContain("Explore");
+    expect(s.content).toContain("Plan");
   });
 });

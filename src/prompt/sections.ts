@@ -1,5 +1,10 @@
 import type { Section } from "./types.js";
 
+export interface AgentRoleSummary {
+  name: string;
+  description: string;
+}
+
 // instructionSection —— 项目指令（priority 0，最靠前）
 export function instructionSection(text: string): Section {
   return {
@@ -15,6 +20,24 @@ export function memorySection(text: string): Section {
     name: "记忆索引",
     priority: 0.5,
     content: text ? `以下已沉淀的项目和个人记忆可供参考：\n\n${text}` : "",
+  };
+}
+
+// agentRolesSection —— 当前可用 Agent 角色（priority 0.75，在身份之前）
+export function agentRolesSection(roles: AgentRoleSummary[]): Section {
+  if (roles.length === 0) {
+    return {
+      name: "Agent 角色",
+      priority: 0.75,
+      content: "",
+    };
+  }
+
+  const lines = roles.map((role) => `- ${role.name}: ${role.description}`);
+  return {
+    name: "Agent 角色",
+    priority: 0.75,
+    content: `当前会话可用的预定义子 Agent 角色如下。\n若用户询问有哪些 subagent、Agent 角色或预定义代理，直接基于此列表回答，不要说没有预定义角色：\n\n${lines.join("\n")}`,
   };
 }
 
