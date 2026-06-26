@@ -16,10 +16,10 @@ codia — 终端 AI 编程助手
 用法: codia [选项]
 
 选项:
-  --session, -s <id>     继续指定的会话
-  --sessions, -ls         列出所有历史会话
-  --bypassPermissions     启动时进入 bypassPermissions 模式（跳过权限确认，仅保留黑名单）
-  --help, -h              显示帮助信息
+  --session <id>, -s <id>  继续指定的会话
+  --sessions, -l            列出所有历史会话
+  --bypassPermissions       启动时进入 bypassPermissions 模式（跳过权限确认，仅保留黑名单）
+  --help, -h                显示帮助信息
 
 运行时命令:
   /default        切换为 default 权限模式
