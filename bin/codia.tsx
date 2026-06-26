@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 
 import { parseArgs } from "node:util";
+import { existsSync } from "node:fs";
 
 import { render } from "ink";
 import { loadAppConfig, ConfigError } from "../src/config/index.js";
@@ -89,6 +90,11 @@ async function main() {
   const sessionId = typeof values.session === "string" ? values.session : undefined;
 
   if (sessionId) {
+    const sessionFile = sessionPath(sessionId);
+    if (!existsSync(sessionFile)) {
+      console.error(`会话不存在：${sessionId}`);
+      process.exit(1);
+    }
     console.log(`继续会话：${sessionId}`);
   }
 

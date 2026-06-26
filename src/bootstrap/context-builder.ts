@@ -102,6 +102,21 @@ export function buildResumeContext(
     });
 
     base.recoveredMessages = recovery.messages;
+
+    if (recovery.messages.length > 0) {
+      const firstUser = recovery.messages.find((m) => m.role === "user");
+      base.sessionSummary = {
+        id: sessionId,
+        path: fp,
+        title: firstUser?.content?.slice(0, 60) ?? "",
+        messageCount: recovery.messages.length,
+        lastActivityAt: recovery.lastActivityAt,
+        isCorrupted: recovery.truncated,
+        recoverable: true,
+        warnings: recovery.warnings,
+      };
+    }
+
     if (recovery.warnings.length > 0) {
       recovery.warnings.forEach((w) => {
         base.diagnostics.entries.push({
