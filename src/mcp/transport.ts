@@ -14,6 +14,7 @@ export class StdioTransport implements Transport {
   private child: ChildProcess;
   private reader: ReturnType<typeof createInterface>;
   public onMessage: ((msg: JsonRpcMessage) => void) | null = null;
+  private spawnError: Error | null = null;
 
   constructor(command: string, args: string[] = [], env?: Record<string, string>) {
     this.child = spawn(command, args, {
@@ -21,9 +22,9 @@ export class StdioTransport implements Transport {
       env: env ? { ...process.env, ...env } : undefined,
     });
 
-    // 捕获子进程异常事件，避免未处理 error 导致进程退出
-    this.child.on("error", () => {
-      // 错误由调用方（McpClient.connect）的 try/catch 处理
+    // 保存 spawn 异常，供 send() 快速失败，避免向已失败的子进程写入时挂起
+    this.child.on("error", (err) => {
+      this.spawnError = err;
     });
 
     // 逐行读取 stdout
@@ -46,9 +47,26 @@ export class StdioTransport implements Transport {
   }
 
   async send(message: JsonRpcMessage): Promise<void> {
+    // spawn 失败时立即抛出，避免向已关闭/损坏的 stdin 写入导致挂起
+    if (this.spawnError) {
+      throw this.spawnError;
+    }
+
     const line = JSON.stringify(message) + "\n";
     return new Promise<void>((resolve, reject) => {
+      const onError = (err: Error) => {
+        cleanup();
+        reject(err);
+      };
+      const cleanup = () => {
+        this.child.off("error", onError);
+      };
+
+      // send 过程中若子进程触发 error，立即 reject，避免 write callback 永不调用
+      this.child.once("error", onError);
+
       this.child.stdin!.write(line, (err) => {
+        cleanup();
         if (err) reject(err);
         else resolve();
       });
