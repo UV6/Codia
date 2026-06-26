@@ -26,10 +26,18 @@ export interface MemoryConfig {
   enabled?: boolean; // 是否启用自动记忆，默认 true
 }
 
+// UIConfig —— 终端界面配置
+export interface UIConfig {
+  pet: {
+    enabled: boolean; // 是否显示启动页宠物图案，默认 false
+  };
+}
+
 // AppConfig —— 完整应用配置
 export interface AppConfig extends ChatConfig {
   agentLoop: AgentLoopYamlConfig;
   memory: MemoryConfig;
+  ui: UIConfig;
   mcp?: { servers: Record<string, Record<string, unknown>> }; // mcp_servers 段原始值，不做展开（展开在 mcp/config.ts 中）
   coordinator?: { enabled: boolean }; // Coordinator 模式能力开关
 }
@@ -96,7 +104,16 @@ export function loadAppConfig(path: string = DEFAULT_CONFIG_PATH): AppConfig {
   try {
     raw = readFileSync(path, "utf-8");
   } catch {
-    return { ...chatConfig, agentLoop: {}, memory: {} };
+    return {
+      ...chatConfig,
+      agentLoop: {},
+      memory: {},
+      ui: {
+        pet: {
+          enabled: false,
+        },
+      },
+    };
   }
 
   const parsed = parse(raw) as Record<string, unknown>;
@@ -115,12 +132,22 @@ export function loadAppConfig(path: string = DEFAULT_CONFIG_PATH): AppConfig {
     memory.enabled = memoryRaw.enabled;
   }
 
+  // 解析 ui 段
+  const uiRaw = (parsed.ui as Record<string, unknown>) ?? {};
+  const petRaw = (uiRaw.pet as Record<string, unknown>) ?? {};
+  const ui: UIConfig = {
+    pet: {
+      enabled: typeof petRaw.enabled === "boolean" ? petRaw.enabled : false,
+    },
+  };
+
   return {
     ...chatConfig,
     agentLoop: {
       maxRounds: typeof agentLoop.max_rounds === "number" ? agentLoop.max_rounds : undefined,
     },
     memory,
+    ui,
     mcp: mcpServers ? { servers: mcpServers } : undefined,
   };
 }

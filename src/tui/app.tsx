@@ -23,10 +23,11 @@ import type { UIContext } from "../command/types.js";
 
 interface AppProps {
   service: ChatService;
+  showPet: boolean;
 }
 
 // App —— Ink 根组件，管理全局状态
-export function App({ service }: AppProps) {
+export function App({ service, showPet }: AppProps) {
   const [messages, setMessages] = useState<Message[]>(service.history);
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [streamingThinking, setStreamingThinking] = useState<string>("");
@@ -334,6 +335,7 @@ export function App({ service }: AppProps) {
         version={pkg.version}
         model={service.currentModel}
         cwd={process.cwd()}
+        showPet={showPet}
       />
 
       <ChatView

@@ -132,7 +132,7 @@ async function main() {
     },
   }) as typeof process.stdout;
 
-  const { waitUntilExit } = render(<App service={service} />, {
+  const { waitUntilExit } = render(<App service={service} showPet={appConfig.ui.pet.enabled} />, {
     exitOnCtrlC: true,
     stdout,
   });
