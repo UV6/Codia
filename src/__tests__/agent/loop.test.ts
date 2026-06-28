@@ -295,6 +295,53 @@ describe("AgentLoop", () => {
     expect(provider.lastTools![0].name).toBe("read_file");
   });
 
+  it("检测到可见计划后发送阶段更新，并在每轮后推进当前阶段", async () => {
+    const provider = new MockProvider([
+      [
+        {
+          type: "text",
+          content: "计划：\n1. 搜索相关代码\n2. 修改实现\n3. 运行测试\n\n先开始第一步。",
+        },
+        { type: "tool_use", call: { id: "t1", name: "read_file", input: { filePath: "a.txt" } } },
+        { type: "done" },
+      ],
+      [
+        { type: "text", content: "全部完成。" },
+        { type: "done" },
+      ],
+    ]);
+
+    const readTool = makeTool({
+      name: "read_file",
+      readOnly: true,
+      destructive: false,
+      execute: async () => ({ status: "success", content: "file content" }),
+    });
+
+    const registry = new TestRegistry([readTool]) as unknown as ToolRegistry;
+    const loop = new AgentLoop(registry);
+    const messages: Message[] = [];
+
+    const { signal } = createSignal();
+    const events = await collectEvents(
+      loop.run(messages, provider, chatConfig, { maxRounds: 5, mode: "full" }, signal),
+    );
+
+    const planUpdates = events.filter((event) => event.type === "plan_update");
+    expect(planUpdates).toHaveLength(3);
+
+    const first = planUpdates[0] as Extract<AgentEvent, { type: "plan_update" }>;
+    expect(first.phases[0].status).toBe("in_progress");
+    expect(first.phases[1].status).toBe("pending");
+
+    const second = planUpdates[1] as Extract<AgentEvent, { type: "plan_update" }>;
+    expect(second.phases[0].status).toBe("completed");
+    expect(second.phases[1].status).toBe("in_progress");
+
+    const third = planUpdates[2] as Extract<AgentEvent, { type: "plan_update" }>;
+    expect(third.phases.every((phase) => phase.status === "completed")).toBe(true);
+  });
+
   it("部分工具不存在但其他执行成功 → 不触发 unknown_tool", async () => {
     // 第一轮：两种工具调用（一个存在、一个不存在）
     // 第二轮：模型看到结果后续写文本，自然结束

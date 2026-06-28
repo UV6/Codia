@@ -24,11 +24,22 @@ export interface AgentLoopConfig {
   allowedTools?: string[];  // Skill 白名单过滤，存在时仅允许列表中的工具
 }
 
+export type TaskPhaseStatus = "pending" | "in_progress" | "completed" | "failed";
+
+// TaskPhase —— 长任务中的阶段状态
+export interface TaskPhase {
+  id: string;
+  title: string;
+  taskTitle?: string;
+  status: TaskPhaseStatus;
+}
+
 // AgentEvent —— Agent Loop 向外推送的事件类型
 // 在现有 Chunk 基础上扩展 Agent 层特有事件
 export type AgentEvent =
   | Chunk
   | CompressEvent
+  | { type: "plan_update"; phases: TaskPhase[] }
   | { type: "tool_execution_start"; callId: string; name: string }
   | { type: "tool_result"; callId: string; name: string; result: ToolResult }
   | { type: "round_start"; round: number }

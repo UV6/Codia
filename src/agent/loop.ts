@@ -4,6 +4,7 @@ import type { ToolRegistry } from "../tool/registry.js";
 import { StreamCollector } from "./stream-collector.js";
 import { ToolScheduler } from "./tool-scheduler.js";
 import { filterReadOnlyTools } from "./plan-mode.js";
+import { parsePlanPhases, advancePhases, completePhases } from "./phase-tracker.js";
 import type { PermissionChecker } from "../permission/checker.js";
 import type { HookEngine } from "../hook/engine.js";
 import type { ContextManager } from "../context/manager.js";
@@ -68,6 +69,7 @@ export class AgentLoop {
     const allToolMetas = this.registry.getAllMetas();
 
     let round = 0;
+    let phases = parsePlanPhases(messages.at(-1)?.content ?? "");
 
     while (round < maxRounds) {
       yield { type: "round_start", round };
@@ -151,6 +153,14 @@ export class AgentLoop {
 
       const result = collector.getResult();
 
+      if (phases.length === 0) {
+        const parsedPhases = parsePlanPhases(result.fullText);
+        if (parsedPhases.length > 0) {
+          phases = parsedPhases;
+          yield { type: "plan_update", phases };
+        }
+      }
+
       // post_llm Hook
       if (this.hookEngine) {
         try {
@@ -180,6 +190,10 @@ export class AgentLoop {
             usage: result.usage,
           };
           messages.push(finalMsg);
+        }
+        if (phases.length > 0) {
+          phases = completePhases(phases);
+          yield { type: "plan_update", phases };
         }
         // 更新 token 估算锚点
         if (result.usage && this.contextManager) {
@@ -268,6 +282,11 @@ export class AgentLoop {
           }),
         };
         messages.push(combinedMsg);
+      }
+
+      if (phases.length > 0) {
+        phases = advancePhases(phases);
+        yield { type: "plan_update", phases };
       }
 
       round++;

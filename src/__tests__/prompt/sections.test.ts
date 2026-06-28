@@ -58,6 +58,12 @@ describe("Sections", () => {
     expect(s.content).toContain("优先使用专用工具");
   });
 
+  it("任务模式 section 要求多步骤任务先输出可见计划", () => {
+    const s = taskModeSection();
+    expect(s.content).toContain("在任何工具调用前都先输出一个可见的\"计划：\"列表");
+    expect(s.content).toContain("不要只在 thinking 里调整");
+  });
+
   it("Agent 角色 section 包含预定义角色清单提示", () => {
     const s = agentRolesSection([
       { name: "Explore", description: "只读代码探索" },

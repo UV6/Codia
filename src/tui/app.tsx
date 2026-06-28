@@ -5,11 +5,13 @@ import { basename } from "node:path";
 import { InputBox } from "./input-box.js";
 import { ChatView } from "./chat-view.js";
 import { ThinkingBox } from "./thinking-box.js";
+import { PhasePanel } from "./phase-panel.js";
 import { InfoBar } from "./info-bar.js";
 import { StartupBanner } from "./startup-banner.js";
 import pkg from "../../package.json" with { type: "json" };
 import type { Message } from "../provider/types.js";
 import type { ChatService } from "../chat/chat-service.js";
+import type { TaskPhase } from "../agent/types.js";
 import type { HumanChoice, HumanPrompt, PermissionMode } from "../permission/types.js";
 import { CommandRegistry } from "../command/registry.js";
 import { parseCommand } from "../command/parser.js";
@@ -44,6 +46,7 @@ export function App({ service, showPet }: AppProps) {
   const [toolCount, setToolCount] = useState(service.toolCount);
   const [contextTokens, setContextTokens] = useState(0);
   const [contextMax, setContextMax] = useState(200_000);
+  const [phases, setPhases] = useState<TaskPhase[]>([]);
 
   // 权限确认状态
   const [permissionPrompt, setPermissionPrompt] = useState<HumanPrompt | null>(null);
@@ -112,6 +115,7 @@ export function App({ service, showPet }: AppProps) {
     setThinkingCollapsed(false);
     setIsStreaming(true);
     setCurrentRound(0);
+    setPhases([]);
 
     // 立即把用户消息加入视图
     const userMsg: Message = {
@@ -150,6 +154,9 @@ export function App({ service, showPet }: AppProps) {
             break;
           case "tool_status":
             setToolStatus(`🔧 ${chunk.name} ${chunk.param}`);
+            break;
+          case "plan_update":
+            setPhases(chunk.phases);
             break;
           case "error":
             setError(chunk.error.message);
@@ -337,6 +344,8 @@ export function App({ service, showPet }: AppProps) {
         cwd={process.cwd()}
         showPet={showPet}
       />
+
+      <PhasePanel phases={phases} />
 
       <ChatView
         messages={messages}
