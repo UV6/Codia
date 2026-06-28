@@ -18,3 +18,4 @@ files/
 .understand-anything/
 
 .agents/
+.pnpm-store/
