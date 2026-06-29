@@ -32,8 +32,13 @@ export class SubAgentRunner {
 
     // 0. 检查是否需要 worktree 隔离（由 AgentTool 层 resolve，Runner 只看 config.isolation）
     if (config.isolation) {
-        // 生成唯一名称：agent-a<hex6>
-        worktreeName = `agent-a${randomBytes(3).toString("hex")}`;
+        // 基于任务描述生成有意义的名称，仅保留 ASCII 字母数字，追加短 hex 防冲突
+        const safeDesc = config.description
+          .replace(/[^a-zA-Z0-9_-]/g, "-")
+          .replace(/-+/g, "-")
+          .replace(/^-|-$/g, "")
+          .slice(0, 24) || "task";
+        worktreeName = `agent-${safeDesc}-${randomBytes(2).toString("hex")}`;
 
         const wtConfig: WorktreeConfig = {
           repoRoot: config.cwd,
