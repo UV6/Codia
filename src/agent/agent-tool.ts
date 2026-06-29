@@ -45,8 +45,9 @@ export class AgentTool implements Tool {
         description: "是否显式后台运行",
       },
       isolation: {
-        type: "string",
-        description: '隔离模式（预留，"worktree"）',
+        type: "boolean",
+        description:
+          "是否启用 git worktree 文件系统隔离。默认遵循角色配置，显式传入则覆盖角色默认值",
       },
     },
     required: ["description", "prompt"],
@@ -94,27 +95,33 @@ export class AgentTool implements Tool {
     const model = params.model as string | undefined;
     const runInBackground = params.run_in_background === true;
 
+    // isolation 优先级：工具调用参数 > 角色 frontmatter > false
+    const role = subagentType ? this.registry.resolve(subagentType) : undefined;
+    if (subagentType && !role) {
+      return {
+        status: "error",
+        content: `角色 "${subagentType}" 不存在。可用角色：${this.registry
+          .list()
+          .map((r) => r.frontmatter.name)
+          .join(", ")}`,
+      };
+    }
+    const isolation =
+      typeof params.isolation === "boolean"
+        ? params.isolation
+        : role?.frontmatter.isolation === "worktree";
+
     // 解析类型：有 subagent_type → 定义式，留空 → Fork 式
     if (subagentType) {
       // 定义式
-      const role = this.registry.resolve(subagentType);
-      if (!role) {
-        return {
-          status: "error",
-          content: `角色 "${subagentType}" 不存在。可用角色：${this.registry
-            .list()
-            .map((r) => r.frontmatter.name)
-            .join(", ")}`,
-        };
-      }
-
       const subAgentConfig: SubAgentConfig = {
         type: "definition",
-        role,
+        role: role!,
         prompt,
         description,
-        name: displayName ?? role.frontmatter.name,
+        name: displayName ?? role!.frontmatter.name,
         model,
+        isolation,
         runInBackground: false, // 定义式默认前台，除非显式指定
         parentMessages: [],
         parentProvider: this.provider,
@@ -135,6 +142,7 @@ export class AgentTool implements Tool {
       description,
       name: displayName ?? "fork",
       model,
+      isolation,
       runInBackground: true, // Fork 强制后台
       parentMessages: this.getParentMessages(),
       parentProvider: this.provider,
