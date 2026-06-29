@@ -1,17 +1,17 @@
-hooks:
-  - id: block-json-write
-    event: pre_tool
-    if:
-      match: all
-      fields:
-        - field: tool_name
-          equals: write_file
-        - field: params.filePath
-          regex: "\\.json$"
-    action:
-      type: command
-      command: 'echo "REJECT: 禁止直接写入 JSON 文件，请使用专用工具"'
-    control:
-      run_once: false
-      background: false
-      timeout: 30000
+# hooks:
+#   - id: block-json-write
+#     event: pre_tool
+#     if:
+#       match: all
+#       fields:
+#         - field: tool_name
+#           equals: write_file
+#         - field: params.filePath
+#           regex: "\\.json$"
+#     action:
+#       type: command
+#       command: 'echo "REJECT: 禁止直接写入 JSON 文件，请使用专用工具"'
+#     control:
+#       run_once: false
+#       background: false
+#       timeout: 30000

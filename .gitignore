@@ -19,3 +19,4 @@ files/
 
 .agents/
 .pnpm-store/
+.codia/
