@@ -30,8 +30,8 @@ export class SubAgentRunner {
     const originalCwd = config.cwd;
     const originalPrompt = config.prompt;
 
-    // 0. 检查是否需要 worktree 隔离
-      if (config.role?.frontmatter.isolation === "worktree") {
+    // 0. 检查是否需要 worktree 隔离（由 AgentTool 层 resolve，Runner 只看 config.isolation）
+    if (config.isolation) {
         // 生成唯一名称：agent-a<hex6>
         worktreeName = `agent-a${randomBytes(3).toString("hex")}`;
 
