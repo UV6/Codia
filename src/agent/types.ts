@@ -71,6 +71,7 @@ export interface SubAgentConfig {
   description: string; // 简短描述，用于进度展示
   name?: string; // 显示名称
   model?: string; // 模型覆盖
+  isolation: boolean; // 是否启用 worktree 文件系统隔离
   runInBackground: boolean; // 是否后台运行（Fork 强制 true）
   parentMessages: Message[]; // 父对话消息（Fork 式继承用）
   parentProvider: LLMProvider;
