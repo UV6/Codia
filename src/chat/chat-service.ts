@@ -56,6 +56,7 @@ import { MailboxSystem } from "../team/mailbox-system.js";
 import { MemberBackend } from "../team/member-backend.js";
 import { LeadOrchestrator } from "../team/lead-orchestrator.js";
 import { createTeamTools } from "../team/team-tools.js";
+import { createTeamTool } from "../team/create-team-tool.js";
 import type { AppConfig } from "../config/index.js";
 
 // ChatService —— 对话核心
@@ -274,6 +275,7 @@ export class ChatService {
 
     // 初始化 Team 系统
     this.teamManager = new TeamManager();
+    this.registry.register(createTeamTool(this.teamManager));
 
     // 构建完整 System Prompt：Skill 摘要 + 项目指令 + 记忆索引 + 七个固定模块 + 环境信息
     const builder = new SystemPromptBuilder();

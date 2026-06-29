@@ -30,6 +30,9 @@ export class TeamManager {
   // createTeam —— 创建新小组
   async createTeam(name: string, leadName: string): Promise<TeamConfig> {
     const teamDir = join(this.persistenceRoot, name);
+    if (existsSync(this.groupPath(name))) {
+      throw new Error(`小组 "${name}" 已存在`);
+    }
     mkdirSync(teamDir, { recursive: true });
     mkdirSync(join(teamDir, "members", "mailbox"), { recursive: true });
 

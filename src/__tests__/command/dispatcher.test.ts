@@ -6,16 +6,18 @@ function makeMockUI(): UIContext {
   return {
     showMessage: vi.fn(),
     sendUserMessage: vi.fn(),
+    createTeam: vi.fn(async (teamName: string, leadName: string) => ({ name: teamName, lead: leadName })),
+    listTeams: vi.fn(async () => []),
     clearMessages: vi.fn(),
     setMode: vi.fn(),
-    getMode: vi.fn(() => "full"),
+    getMode: () => "full",
     setPermissionMode: vi.fn(),
     getTokenUsage: vi.fn(() => ({ inputTokens: 100, outputTokens: 50, model: "test" })),
     triggerCompact: vi.fn(),
     refreshStatus: vi.fn(),
     getContextInfo: vi.fn(() => ({ estimatedTokens: 0, messageCount: 0, maxTokens: 200_000 })),
     getCwd: vi.fn(() => "/mock/project"),
-  } as UIContext;
+  };
 }
 
 describe("dispatch", () => {

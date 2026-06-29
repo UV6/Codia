@@ -22,6 +22,7 @@ import { setCommandProvider as setSkillsCommandProvider } from "../command/built
 import { setSessionInfoProvider } from "../command/builtin/session.js";
 import { setPermissionInfoProvider } from "../command/builtin/permission.js";
 import type { UIContext } from "../command/types.js";
+import { createTeamWithLead } from "../team/create-team.js";
 
 interface AppProps {
   service: ChatService;
@@ -203,6 +204,15 @@ export function App({ service, showPet }: AppProps) {
     sendUserMessage(text: string): void {
       // 直接走 AI 路径，绕过命令分流器
       handleAISubmit(text);
+    },
+
+    async createTeam(teamName: string, leadName: string): Promise<{ name: string; lead: string }> {
+      const team = await createTeamWithLead(service.teamManagerInstance, teamName, leadName);
+      return { name: team.name, lead: team.lead };
+    },
+
+    async listTeams(): Promise<string[]> {
+      return service.teamManagerInstance.listTeams();
     },
 
     clearMessages(): void {

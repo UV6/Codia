@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ChatService } from "../../chat/chat-service.js";
 import type { ChatConfig } from "../../provider/types.js";
+import { ToolRegistry } from "../../tool/registry.js";
 
 const testConfig: ChatConfig = {
   protocol: "anthropic",
@@ -22,5 +23,15 @@ describe("ChatService", () => {
     expect(prompt).toContain("Plan");
     expect(prompt).toContain("general-purpose");
     expect(prompt).toContain("Verification");
+  });
+
+  it("启动时注册 CreateTeam 工具", async () => {
+    const service = await ChatService.create(testConfig, {
+      projectRoot: "/tmp/codia-chat-service-test",
+    });
+
+    const registry = (service as unknown as { registry: ToolRegistry }).registry;
+
+    expect(registry.get("CreateTeam")).toBeDefined();
   });
 });

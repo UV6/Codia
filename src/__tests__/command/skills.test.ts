@@ -9,6 +9,8 @@ function makeUIContext(overrides: Partial<UIContext> = {}): UIContext {
   return {
     showMessage: vi.fn(),
     sendUserMessage: vi.fn(),
+    createTeam: vi.fn(async (teamName: string, leadName: string) => ({ name: teamName, lead: leadName })),
+    listTeams: vi.fn(async () => []),
     clearMessages: vi.fn(),
     setMode: vi.fn(),
     getMode: () => "full",

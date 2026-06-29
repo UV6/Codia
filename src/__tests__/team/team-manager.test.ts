@@ -37,6 +37,11 @@ describe("TeamManager", () => {
       expect(config.createdAt).toBeTruthy();
       expect(config.updatedAt).toBeTruthy();
     });
+
+    it("重复创建同名小组时报错", async () => {
+      await manager.createTeam("test-team", "lead1");
+      await expect(manager.createTeam("test-team", "lead2")).rejects.toThrow("已存在");
+    });
   });
 
   describe("loadTeam", () => {
