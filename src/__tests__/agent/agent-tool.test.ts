@@ -127,5 +127,6 @@ describe("AgentTool", () => {
     expect(properties.model).toBeDefined();
     expect(properties.run_in_background).toBeDefined();
     expect(properties.isolation).toBeDefined();
+    expect(properties.isolation.type).toBe("boolean");
   });
 });
