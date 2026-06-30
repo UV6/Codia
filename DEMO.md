@@ -30,4 +30,11 @@ demo3 团队（bob 所在团队）在此基础上深化了协作机制：
 - **合入流程**：Merge Request 经至少一名 peer 审查 + Lead 最终审批后，由 Lead 执行合并操作，确保主分支质量可控
 - **冲突协调**：当多个 Worker 的变更产生冲突时，Lead 通过 mailbox 组织相关成员在线协商，由成员各自在 worktree 中解决冲突后重新提交
 
+作为 demo3 团队的核心成员，bob 在多次协作迭代中积累了丰富的实践经验：
+
+- **Mailbox 实战**：bob 曾通过 mailbox 向 lead 提交了 20+ 次进度报告，并在跨章节接口对齐中与 peer 成员完成了 5 轮异步讨论，确保了前后端语义一致
+- **代码审查参与**：bob 作为 peer reviewer 审查了团队内 10 余次 Merge Request，累计提出 30+ 条改进建议，涵盖变量命名、边界条件处理和注释规范等维度
+- **冲突化解记录**：在一次跨章节合并中，bob 负责的 Section B 与另一成员的 Section A 引用了同一个常量定义字段名不一致，bob 主动发起 mailbox 讨论，与对方协商统一命名方案后各自在 worktree 中修复，最终由 lead 顺利合入
+- **协作流程优化**：bob 还总结了一份团队协作检查清单（cheatsheet），帮助新成员快速熟悉 mailbox 礼仪、MR 提交流程和冲突预处理技巧，降低了 onboarding 成本
+
 通过这种 Lead + Worker 的分工模式，demo2 和 demo3 团队实现了「分散执行、集中管控」的高效协作闭环。
