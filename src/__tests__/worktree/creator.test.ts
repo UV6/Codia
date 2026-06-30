@@ -31,7 +31,7 @@ function createMockInitializer(): WorktreeInitializer {
 const config: WorktreeConfig = {
   repoRoot: "/tmp/test-repo",
   baseBranch: "main",
-  worktreesDir: "/tmp/test-repo/.codia/worktrees",
+  worktreesDir: "/tmp/codia-home/projects/test-repo-id/worktrees",
   copyPatterns: [],
   symlinkDirs: [],
 };

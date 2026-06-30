@@ -45,6 +45,10 @@ export class RealGitWorktreeOps implements GitWorktreeOps {
     ]);
   }
 
+  async moveWorktree(fromPath: string, toPath: string): Promise<void> {
+    await execGit(this.repoRoot, ["worktree", "move", fromPath, toPath]);
+  }
+
   async removeWorktree(path: string, force: boolean): Promise<void> {
     const args = ["worktree", "remove"];
     if (force) args.push("--force");

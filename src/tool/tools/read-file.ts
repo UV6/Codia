@@ -1,6 +1,7 @@
 import { readFileSync, openSync, readSync, closeSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Tool, ToolContext, ToolResult, ToolInputSchema } from "../types.js";
+import { buildCodiaFilePermissionRequest } from "../team-file-permission.js";
 
 const inputSchema: ToolInputSchema = {
   type: "object",
@@ -37,6 +38,9 @@ export const readFileTool: Tool = {
   readOnly: true,
   destructive: false,
   inputSchema,
+  buildPermissionRequest(params: Record<string, unknown>, context: ToolContext) {
+    return buildCodiaFilePermissionRequest(params.filePath as string | undefined, context.cwd);
+  },
 
   async execute(params: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
     const filePath = resolve(context.cwd, params.filePath as string);

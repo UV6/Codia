@@ -1,3 +1,5 @@
+import type { PermissionRequest } from "../permission/types.js";
+
 // ToolInputSchema —— JSON Schema 参数定义，符合 Anthropic API 格式
 export interface ToolInputSchema {
   type: "object";
@@ -55,5 +57,9 @@ export interface Tool {
   readonly readOnly: boolean;
   readonly destructive: boolean;
   readonly inputSchema: ToolInputSchema;
+  buildPermissionRequest?(
+    params: Record<string, unknown>,
+    context: ToolContext,
+  ): Partial<PermissionRequest>;
   execute(params: Record<string, unknown>, context: ToolContext): Promise<ToolResult>;
 }

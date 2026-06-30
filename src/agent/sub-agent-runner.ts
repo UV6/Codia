@@ -12,6 +12,7 @@ import type { TaskManager } from "./task-manager.js";
 import { WorktreeManager } from "../worktree/manager.js";
 import { RealGitWorktreeOps } from "../worktree/git-ops.js";
 import type { WorktreeConfig } from "../worktree/types.js";
+import { directoryHasEntries, getLegacyWorktreesDir, getWorktreesDir } from "../storage/paths.js";
 
 // SubAgentRunner —— 子 Agent 运行器，构造隔离环境并驱动 AgentLoop
 export class SubAgentRunner {
@@ -43,11 +44,22 @@ export class SubAgentRunner {
         const wtConfig: WorktreeConfig = {
           repoRoot: config.cwd,
           baseBranch: "main",
-          worktreesDir: `${config.cwd}/.codia/worktrees`,
+          worktreesDir: getWorktreesDir(config.cwd),
           copyPatterns: [".claude/**", "CLAUDE.md"],
           symlinkDirs: [],
           // 检测 node_modules 是否存在，有则加入软链列表
         };
+
+        const legacyWorktreesDir = getLegacyWorktreesDir(config.cwd);
+        if (
+          legacyWorktreesDir !== wtConfig.worktreesDir &&
+          directoryHasEntries(legacyWorktreesDir)
+        ) {
+          console.warn(
+            `[SubAgentRunner] 检测到旧 worktree 目录 ${legacyWorktreesDir}。` +
+            "当前不会自动迁移旧 worktree，请在确认无活动 worktree 后手动处理。",
+          );
+        }
 
         // 检测 node_modules 是否存在
         if (existsSync(`${config.cwd}/node_modules`)) {

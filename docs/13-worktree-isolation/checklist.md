@@ -71,7 +71,7 @@
 - [ ] 场景 1 — 隔离创建与使用：
   1. 准备一个含 `isolation: worktree` 的角色定义
   2. 通过 AgentTool 触发子 Agent 创建
-  3. 观察到 `.codia/worktrees/agent-a<hex>/` 目录生成
+  3. 观察到 `~/.codia/projects/<project-id>/worktrees/agent-a<hex>/` 目录生成
   4. 子 Agent 的工具调用发生在该目录
   5. 子 Agent 完成后无变更自动删除
 
@@ -87,10 +87,16 @@
   3. 尝试以 `.` 作为 name 创建 → 返回 path_traversal 错误
 
 - [ ] 场景 4 — 后台清理：
-  1. 手动在 `.codia/worktrees/` 下创建 `agent-a-expired`（修改时间设为 48 小时前）
+  1. 手动在 `~/.codia/projects/<project-id>/worktrees/` 下创建 `agent-a-expired`（修改时间设为 48 小时前）
   2. 创建 `my-saved-work`（修改时间设为 48 小时前）
   3. 调用 cleaner.cleanup({ cutoffDate: 24h前, autoPatterns: ["agent-a*", "wf_*"] })
   4. 观察到 agent-a-expired 被清理，my-saved-work 保留
+
+- [ ] 场景 7 — 旧目录迁移：
+  1. 在 `<repoRoot>/.codia/worktrees/` 下准备一个已注册的历史 worktree
+  2. 执行 `/worktree migrate`
+  3. 观察到该 worktree 被移动到 `~/.codia/projects/<project-id>/worktrees/`
+  4. 再次执行 `/worktree migrate` 时提示没有可迁移项
 
 - [ ] 场景 5 — 环境初始化：
   1. 创建隔离 worktree

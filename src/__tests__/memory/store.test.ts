@@ -1,23 +1,33 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import {
+  getMemoryDir,
   loadIndexes,
   upsertNote,
   readIndex,
   writeIndex,
   renderIndexText,
 } from "../../memory/store.js";
-import type { MemoryNote, MemoryIndexEntry, MemoryIndexBundle } from "../../memory/types.js";
+import type { MemoryNote, MemoryIndexBundle } from "../../memory/types.js";
+import {
+  getLegacyProjectMemoryDir,
+  getProjectMemoryDir,
+  resolveProjectIdentity,
+} from "../../storage/paths.js";
 
 describe("memory store", () => {
   const projectRoot = join(tmpdir(), "codia-memory-test");
+  const codiaHome = join(tmpdir(), "codia-memory-home", ".codia");
+  const previousCodiaHome = process.env.CODIA_HOME;
 
   function cleanup() {
     try { rmSync(projectRoot, { recursive: true, force: true }); } catch {}
+    try { rmSync(join(tmpdir(), "codia-memory-home"), { recursive: true, force: true }); } catch {}
   }
   function setup() {
+    process.env.CODIA_HOME = codiaHome;
     cleanup();
     mkdirSync(projectRoot, { recursive: true });
   }
@@ -35,6 +45,14 @@ describe("memory store", () => {
       ...overrides,
     };
   }
+
+  afterEach(() => {
+    if (previousCodiaHome === undefined) {
+      delete process.env.CODIA_HOME;
+    } else {
+      process.env.CODIA_HOME = previousCodiaHome;
+    }
+  });
 
   it("添加笔记后可通过 readIndex 读取", () => {
     setup();
@@ -61,15 +79,16 @@ describe("memory store", () => {
 
   it("索引裁剪限制行数", () => {
     setup();
-    // 写入超过 MAX 的条目
-    for (let i = 0; i < 250; i++) {
-      const note = makeNote(`bulk-${i}`, {
-        summary: `Summary for item ${i}`,
-      });
-      upsertNote(note, projectRoot);
-    }
-    const entries = readIndex("project", projectRoot);
-    expect(entries.length).toBeLessThanOrEqual(200);
+    const entries = Array.from({ length: 250 }, (_, i) => ({
+      noteId: `bulk-${i}`,
+      category: "project_knowledge" as const,
+      summary: `Summary for item ${i}`,
+      updatedAt: "",
+      path: `bulk-${i}.md`,
+    }));
+    writeIndex("project", projectRoot, entries);
+    const loaded = readIndex("project", projectRoot);
+    expect(loaded.length).toBeLessThanOrEqual(200);
     cleanup();
   });
 
@@ -96,6 +115,31 @@ describe("memory store", () => {
     const bundle = loadIndexes(projectRoot);
     expect(bundle.project).toBeDefined();
     expect(bundle.user).toBeDefined();
+    cleanup();
+  });
+
+  it("项目级记忆写入用户目录下的项目 runtime 目录", () => {
+    setup();
+    const note = makeNote("runtime-path");
+    upsertNote(note, projectRoot);
+
+    const dir = getMemoryDir("project", projectRoot);
+    const runtimeDir = getProjectMemoryDir(resolveProjectIdentity(projectRoot).repoRoot);
+    expect(dir).toBe(runtimeDir);
+    expect(existsSync(join(runtimeDir, "runtime-path.md"))).toBe(true);
+    cleanup();
+  });
+
+  it("读取项目记忆时会迁移旧的 projectRoot/memory", () => {
+    setup();
+    const legacyDir = getLegacyProjectMemoryDir(projectRoot);
+    mkdirSync(legacyDir, { recursive: true });
+    writeFileSync(join(legacyDir, "MEMORY.md"), "# Memory Index\n\n- [project_knowledge] old summary (old-note)\n", "utf-8");
+
+    const entries = readIndex("project", projectRoot);
+
+    expect(entries.length).toBe(1);
+    expect(existsSync(join(getProjectMemoryDir(resolveProjectIdentity(projectRoot).repoRoot), "MEMORY.md"))).toBe(true);
     cleanup();
   });
 });

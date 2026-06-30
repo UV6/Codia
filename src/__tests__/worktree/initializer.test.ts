@@ -71,7 +71,7 @@ describe("WorktreeInitializer", () => {
       const config: WorktreeConfig = {
         repoRoot,
         baseBranch: "main",
-        worktreesDir: join(repoRoot, ".codia", "worktrees"),
+        worktreesDir: join(tmpdir(), "codia-home", "projects", "initializer-test", "worktrees"),
         copyPatterns: ["CLAUDE.md"],
         symlinkDirs: [],
       };
@@ -91,7 +91,7 @@ describe("WorktreeInitializer", () => {
       const config: WorktreeConfig = {
         repoRoot,
         baseBranch: "main",
-        worktreesDir: join(repoRoot, ".codia", "worktrees"),
+        worktreesDir: join(tmpdir(), "codia-home", "projects", "initializer-test", "worktrees"),
         copyPatterns: [".claude/**"],
         symlinkDirs: [],
       };
@@ -112,7 +112,7 @@ describe("WorktreeInitializer", () => {
       const config: WorktreeConfig = {
         repoRoot,
         baseBranch: "main",
-        worktreesDir: join(repoRoot, ".codia", "worktrees"),
+        worktreesDir: join(tmpdir(), "codia-home", "projects", "initializer-test", "worktrees"),
         copyPatterns: [],
         symlinkDirs: ["node_modules"],
       };

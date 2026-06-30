@@ -22,6 +22,18 @@ function extractPaths(params: Record<string, unknown>): string[] {
   return paths;
 }
 
+function uniquePaths(paths: string[]): string[] {
+  return [...new Set(paths.filter((p) => p.trim() !== ""))];
+}
+
+function normalizeAllowedRoot(root: string): string {
+  try {
+    return realpathSync(root);
+  } catch {
+    return resolve(root);
+  }
+}
+
 // resolveSandboxRoot —— 解析 cwd 的真实路径
 function resolveSandboxRoot(cwd: string): string | null {
   try {
@@ -77,8 +89,10 @@ function isWithinSandbox(
 
 // check —— 检查文件操作是否在沙箱内
 export function check(request: PermissionRequest): PermissionResult | null {
-  // 非文件工具不适用路径沙箱
-  if (request.toolType !== "file") {
+  const explicitPaths = request.targetPaths ?? [];
+
+  // 非文件工具且未显式声明路径时，不适用路径沙箱
+  if (request.toolType !== "file" && explicitPaths.length === 0) {
     return null;
   }
 
@@ -91,20 +105,33 @@ export function check(request: PermissionRequest): PermissionResult | null {
     };
   }
 
-  const paths = extractPaths(request.params);
+  const allowedRoots = [
+    sandboxRoot,
+    ...(request.extraAllowedRoots ?? []),
+  ].map(normalizeAllowedRoot);
+  const paths = uniquePaths([...extractPaths(request.params), ...explicitPaths]);
 
   if (paths.length === 0) {
     return null;
   }
 
   for (const p of paths) {
+    const withinAllowedRoots = (absolutePath: string): boolean => {
+      for (const root of allowedRoots) {
+        if (isWithinSandbox(absolutePath, root, request.cwd)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     // 绝对路径
     if (p.startsWith("/")) {
-      if (!isWithinSandbox(p, sandboxRoot, request.cwd)) {
+      if (!withinAllowedRoots(p)) {
         return {
           decision: "deny",
           layer: 2,
-          reason: `路径沙箱：路径 "${p}" 超出了项目目录 "${sandboxRoot}"`,
+          reason: `路径沙箱：路径 "${p}" 超出了允许范围（项目目录 "${sandboxRoot}"）`,
         };
       }
       continue;
@@ -112,11 +139,11 @@ export function check(request: PermissionRequest): PermissionResult | null {
 
     // 相对路径：resolve 后再检查
     const absolutePath = resolve(request.cwd, p);
-    if (!isWithinSandbox(absolutePath, sandboxRoot, request.cwd)) {
+    if (!withinAllowedRoots(absolutePath)) {
       return {
         decision: "deny",
         layer: 2,
-        reason: `路径沙箱：路径 "${p}"（解析后 "${absolutePath}"）超出了项目目录 "${sandboxRoot}"`,
+        reason: `路径沙箱：路径 "${p}"（解析后 "${absolutePath}"）超出了允许范围（项目目录 "${sandboxRoot}"）`,
       };
     }
   }

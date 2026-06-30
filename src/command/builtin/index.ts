@@ -13,6 +13,7 @@ import { defaultCommand } from "./default.js";
 import { bypassCommand } from "./bypass.js";
 import { skillsCommand } from "./skills.js";
 import { teamCommand } from "./team.js";
+import { worktreeCommand } from "./worktree.js";
 import type { CommandDef } from "../types.js";
 import type { SkillSummary } from "../../skill/types.js";
 
@@ -32,6 +33,7 @@ const NON_SKILL_COMMANDS: CommandDef[] = [
   defaultCommand,
   bypassCommand,
   teamCommand,
+  worktreeCommand,
   skillsCommand,
 ];
 

@@ -2,7 +2,7 @@
 export interface WorktreeConfig {
   repoRoot: string; // git 仓库根路径
   baseBranch: string; // worktree 基于的分支（如 "main"）
-  worktreesDir: string; // worktree 存放目录，默认 "<repoRoot>/.codia/worktrees"
+  worktreesDir: string; // worktree 存放目录，默认 "~/.codia/projects/<project-id>/worktrees"
   copyPatterns: string[]; // 需复制的配置 glob，如 [".claude/**", "CLAUDE.md"]
   symlinkDirs: string[]; // 需软链的目录，如 ["node_modules"]
 }
@@ -42,6 +42,7 @@ export interface ExitResult {
 // GitWorktreeOps —— Git worktree 操作的接口抽象，便于测试 mock
 export interface GitWorktreeOps {
   addWorktree(path: string, branch: string, baseBranch: string): Promise<void>;
+  moveWorktree?(fromPath: string, toPath: string): Promise<void>;
   removeWorktree(path: string, force: boolean): Promise<void>;
   deleteBranch(branch: string): Promise<void>;
   getBranchName(path: string): Promise<string>;
@@ -51,6 +52,11 @@ export interface GitWorktreeOps {
   listWorktrees(): Promise<string[]>; // 返回所有 worktree 路径
   getLastModified(path: string): Promise<Date>;
   getHooksPath(repoRoot: string): Promise<string | null>; // git config core.hooksPath
+}
+
+export interface WorktreeMigrationResult {
+  moved: Array<{ from: string; to: string }>;
+  skipped: Array<{ path: string; reason: string }>;
 }
 
 // ValidationErrorCode —— 路径校验错误码

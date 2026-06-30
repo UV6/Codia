@@ -10,6 +10,7 @@ export interface UIContext {
   sendUserMessage(text: string): void; // 直接调 ChatService.sendMessage()，绕过命令分流器
   createTeam(teamName: string, leadName: string): Promise<{ name: string; lead: string }>;
   listTeams(): Promise<string[]>;
+  migrateLegacyWorktrees?(): Promise<import("../worktree/types.js").WorktreeMigrationResult>;
   clearMessages(): void;
   setMode(mode: "full" | "plan"): void;
   getMode(): "full" | "plan";

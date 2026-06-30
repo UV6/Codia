@@ -113,9 +113,13 @@ describe("SubAgentRunner 配置构造", () => {
 describe("SubAgentRunner worktree 隔离", () => {
   let repoRoot: string;
   let cleanup: () => void;
+  const previousCodiaHome = process.env.CODIA_HOME;
+  let codiaHome: string;
 
   beforeAll(() => {
     repoRoot = realpathSync(mkdtempSync(join(tmpdir(), "codia-wt-test-")));
+    codiaHome = join(repoRoot, ".tmp-codia-home");
+    process.env.CODIA_HOME = codiaHome;
     execFileSync("git", ["init"], { cwd: repoRoot });
     execFileSync("git", ["config", "--local", "user.name", "test"], { cwd: repoRoot });
     execFileSync("git", ["config", "--local", "user.email", "test@test"], { cwd: repoRoot });
@@ -133,6 +137,11 @@ describe("SubAgentRunner worktree 隔离", () => {
   });
 
   afterAll(() => {
+    if (previousCodiaHome === undefined) {
+      delete process.env.CODIA_HOME;
+    } else {
+      process.env.CODIA_HOME = previousCodiaHome;
+    }
     cleanup();
   });
 
@@ -172,7 +181,7 @@ describe("SubAgentRunner worktree 隔离", () => {
 
     // 验证 worktree 目录已被清理（无变更，自动删除）
     // 由于子 Agent 没有做任何修改，worktree 应该被自动清理
-    const worktreesDir = join(repoRoot, ".codia", "worktrees");
+    const worktreesDir = join(codiaHome, "projects");
     if (existsSync(worktreesDir)) {
       // 可能还有目录但纯空，或者有其他测试遗留
     }

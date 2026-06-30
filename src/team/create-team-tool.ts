@@ -1,6 +1,8 @@
 import type { Tool, ToolContext, ToolInputSchema, ToolResult } from "../tool/types.js";
 import type { TeamManager } from "./team-manager.js";
 import { createTeamWithLead } from "./create-team.js";
+import type { PermissionRequest } from "../permission/types.js";
+import { join } from "node:path";
 
 const inputSchema: ToolInputSchema = {
   type: "object",
@@ -15,10 +17,23 @@ export function createTeamTool(teamManager: TeamManager): Tool {
   return {
     name: "CreateTeam",
     description: "创建一个新的 team，并初始化 Lead 的邮箱。用户用自然语言要求创建 team 时使用。",
-    type: "search",
+    type: "file",
     readOnly: false,
-    destructive: false,
+    destructive: true,
     inputSchema,
+    buildPermissionRequest(params: Record<string, unknown>, _context: ToolContext): Partial<PermissionRequest> {
+      const teamName = params.teamName as string | undefined;
+      if (!teamName) {
+        return {};
+      }
+
+      const teamsRoot = teamManager.getPersistenceRoot();
+      const groupPath = join(teamManager.getTeamDir(teamName), "group.json");
+      return {
+        targetPaths: [groupPath],
+        extraAllowedRoots: [teamsRoot],
+      };
+    },
     async execute(params: Record<string, unknown>, _context: ToolContext): Promise<ToolResult> {
       try {
         const team = await createTeamWithLead(

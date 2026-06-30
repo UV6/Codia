@@ -57,4 +57,18 @@ describe("CreateTeamTool", () => {
     expect(result.status).toBe("error");
     expect(result.content).toContain("已存在");
   });
+
+  it("权限请求声明 team 文件路径和根目录", () => {
+    const tool = createTeamTool(manager);
+
+    const request = tool.buildPermissionRequest?.(
+      { teamName: "alpha", leadName: "alice" },
+      { cwd: tmpDir, signal: new AbortController().signal },
+    );
+
+    expect(tool.type).toBe("file");
+    expect(tool.destructive).toBe(true);
+    expect(request?.targetPaths).toEqual([join(tmpDir, "alpha", "group.json")]);
+    expect(request?.extraAllowedRoots).toEqual([tmpDir]);
+  });
 });

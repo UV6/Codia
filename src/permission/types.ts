@@ -7,6 +7,8 @@ export interface PermissionRequest {
   destructive: boolean; // 是否有副作用
   params: Record<string, unknown>; // 工具调用参数
   cwd: string; // 项目根目录（绝对路径，已解析符号链接）
+  targetPaths?: string[]; // 显式声明本次要访问的路径
+  extraAllowedRoots?: string[]; // 显式追加允许访问的根目录
 }
 
 // PermissionResult —— 权限检查的输出

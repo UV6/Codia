@@ -22,7 +22,7 @@ function createMockOps(overrides?: Partial<GitWorktreeOps>): GitWorktreeOps {
 const config: WorktreeConfig = {
   repoRoot: "/tmp/test-repo",
   baseBranch: "main",
-  worktreesDir: "/tmp/test-repo/.codia/worktrees",
+  worktreesDir: "/tmp/codia-home/projects/test-repo-id/worktrees",
   copyPatterns: [],
   symlinkDirs: [],
 };
@@ -35,7 +35,7 @@ describe("WorktreeManager", () => {
     ops = createMockOps();
     // 默认 listWorktrees 返回已创建的 worktree
     (ops.listWorktrees as ReturnType<typeof vi.fn>).mockResolvedValue([
-      "/tmp/test-repo/.codia/worktrees/test",
+      "/tmp/codia-home/projects/test-repo-id/worktrees/test",
     ]);
     manager = new WorktreeManager(config, ops);
     vi.clearAllMocks();
@@ -44,7 +44,7 @@ describe("WorktreeManager", () => {
   describe("enter", () => {
     it("返回正确的 cwd 绝对路径", async () => {
       const result = await manager.enter("test");
-      expect(result.cwd).toBe("/tmp/test-repo/.codia/worktrees/test");
+      expect(result.cwd).toBe("/tmp/codia-home/projects/test-repo-id/worktrees/test");
       expect(result.info.name).toBe("test");
     });
 
@@ -68,7 +68,7 @@ describe("WorktreeManager", () => {
     it("有未提交修改时拒绝删除（无 force）", async () => {
       const dirtyOps = createMockOps({
         hasUncommittedChanges: vi.fn().mockResolvedValue(true),
-        listWorktrees: vi.fn().mockResolvedValue(["/tmp/test-repo/.codia/worktrees/test"]),
+        listWorktrees: vi.fn().mockResolvedValue(["/tmp/codia-home/projects/test-repo-id/worktrees/test"]),
       });
       const dirtyManager = new WorktreeManager(config, dirtyOps);
 
@@ -81,7 +81,7 @@ describe("WorktreeManager", () => {
     it("有变更 + force 时正常删除", async () => {
       const dirtyOps = createMockOps({
         hasUncommittedChanges: vi.fn().mockResolvedValue(true),
-        listWorktrees: vi.fn().mockResolvedValue(["/tmp/test-repo/.codia/worktrees/test"]),
+        listWorktrees: vi.fn().mockResolvedValue(["/tmp/codia-home/projects/test-repo-id/worktrees/test"]),
       });
       const dirtyManager = new WorktreeManager(config, dirtyOps);
 
@@ -110,7 +110,7 @@ describe("WorktreeManager", () => {
     it("强制删除 worktree", async () => {
       await expect(manager.delete("test")).resolves.toBeUndefined();
       expect(ops.removeWorktree).toHaveBeenCalledWith(
-        "/tmp/test-repo/.codia/worktrees/test",
+        "/tmp/codia-home/projects/test-repo-id/worktrees/test",
         true,
       );
     });

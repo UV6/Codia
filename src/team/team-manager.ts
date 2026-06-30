@@ -1,18 +1,18 @@
 import { mkdirSync, readFileSync, readdirSync, existsSync, rmSync, renameSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import { homedir } from "node:os";
 import type { TeamConfig, MemberInfo } from "./types.js";
+import { getTeamsRoot } from "../storage/paths.js";
 
 // 默认持久化根目录
-export const DEFAULT_TEAMS_ROOT = join(homedir(), ".codia", "teams");
+export const DEFAULT_TEAMS_ROOT = getTeamsRoot();
 
 // TeamManager —— 小组的创建、加载、更新、删除，成员花名册管理
 export class TeamManager {
   private persistenceRoot: string;
 
-  constructor(persistenceRoot: string = DEFAULT_TEAMS_ROOT) {
-    this.persistenceRoot = persistenceRoot;
+  constructor(persistenceRoot?: string) {
+    this.persistenceRoot = persistenceRoot ?? getTeamsRoot();
   }
 
   // group.json 路径

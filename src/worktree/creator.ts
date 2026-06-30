@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
 import type { WorktreeConfig, WorktreeInfo, GitWorktreeOps } from "./types.js";
 import type { WorktreePath } from "./path-validator.js";
 import { WorktreeInitializer } from "./initializer.js";
@@ -34,7 +35,7 @@ export class WorktreeCreator {
       }
     }
 
-    // 2. 确保 .codia/ 在 .gitignore 中
+    // 2. 仅当 worktree 仍落在仓库内时，确保 .codia/ 在 .gitignore 中
     this.ensureGitignore();
 
     // 3. 创建 worktree
@@ -60,6 +61,10 @@ export class WorktreeCreator {
 
   // ensureGitignore —— 检查并确保 .codia/ 目录被 git 忽略
   private ensureGitignore(): void {
+    if (!resolve(this.config.worktreesDir).startsWith(resolve(this.config.repoRoot) + "/")) {
+      return;
+    }
+
     const gitignorePath = `${this.config.repoRoot}/.gitignore`;
 
     try {

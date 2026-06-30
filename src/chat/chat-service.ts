@@ -27,7 +27,6 @@ import {
   agentRolesSection,
 } from "../prompt/sections.js";
 import { execSync } from "node:child_process";
-import { homedir } from "node:os";
 import { join, basename } from "node:path";
 import type { PermissionMode, HumanInTheLoopCallback } from "../permission/types.js";
 import { RuleEngine } from "../permission/rule-engine.js";
@@ -58,6 +57,17 @@ import { LeadOrchestrator } from "../team/lead-orchestrator.js";
 import { createTeamTools } from "../team/team-tools.js";
 import { createTeamTool } from "../team/create-team-tool.js";
 import type { AppConfig } from "../config/index.js";
+import { createTeamWithLead } from "../team/create-team.js";
+import {
+  directoryHasEntries,
+  getLegacyWorktreesDir,
+  getTeamsRoot,
+  getUserCodiaRoot,
+  getWorktreesDir,
+} from "../storage/paths.js";
+import { RealGitWorktreeOps } from "../worktree/git-ops.js";
+import { migrateLegacyWorktrees } from "../worktree/migrate.js";
+import type { WorktreeMigrationResult } from "../worktree/types.js";
 
 // ChatService —— 对话核心
 // 负责消息历史管理、会话持久化、模式与权限控制，循环逻辑委托给 AgentLoop
@@ -99,6 +109,7 @@ export class ChatService {
 
   // Team 系统
   private teamManager: TeamManager;
+  private projectRoot: string;
 
   onUsage: ((usage: { inputTokens: number; outputTokens: number; model: string }) => void) | null =
     null;
@@ -147,6 +158,7 @@ export class ChatService {
     } = {},
   ) {
     this.config = config;
+    this.projectRoot = options.projectRoot ?? process.cwd();
     this.historyPath = bootstrapContext.sessionSummary?.path
       ?? newSessionPath(now, options.projectRoot);
     this.provider = createProvider(config);
@@ -176,7 +188,7 @@ export class ChatService {
       });
     }
 
-    this.skillActivator = new SkillActivator(this.skillRegistry, options.projectRoot ?? process.cwd());
+    this.skillActivator = new SkillActivator(this.skillRegistry, this.projectRoot);
 
     // 生成 Skill 摘要文本
     const summaryLines = skills.map(
@@ -221,19 +233,18 @@ export class ChatService {
     );
 
     // 初始化 Hook 系统
-    const projectRoot = options.projectRoot ?? process.cwd();
     this.hookEngine = new HookEngine(
       loadAllHooks(
-        join(homedir(), ".codia", "hooks.yaml"),
-        join(projectRoot, ".codia", "hooks.yaml"),
-        join(projectRoot, ".codia", "hooks.local.yaml"),
+        join(getUserCodiaRoot(), "hooks.yaml"),
+        join(this.projectRoot, ".codia", "hooks.yaml"),
+        join(this.projectRoot, ".codia", "hooks.local.yaml"),
       ),
     );
 
     this.agentLoop = new AgentLoop(this.registry, this.contextManager, this.hookEngine);
 
     // 初始化 Agent 系统
-    this.agentRoleRegistry = new AgentRoleRegistry(projectRoot);
+    this.agentRoleRegistry = new AgentRoleRegistry(this.projectRoot);
     this.agentRoleRegistry.reload();
 
     this.taskManager = new TaskManager();
@@ -311,8 +322,8 @@ export class ChatService {
 
     // 注册记忆信息 provider（供 /memory 命令使用）
     setMemoryInfoProvider(() => {
-      const projectNotes = listNotes("project", projectRoot);
-      const userNotes = listNotes("user", projectRoot);
+      const projectNotes = listNotes("project", this.projectRoot);
+      const userNotes = listNotes("user", this.projectRoot);
 
       const categoryLabel: Record<string, string> = {
         user_preference: "用户偏好",
@@ -351,7 +362,7 @@ export class ChatService {
     // 触发 session_start Hook（异步，不阻塞构造）
     this.hookEngine.fire("session_start", {
       session_id: sessionId,
-      cwd: projectRoot,
+      cwd: this.projectRoot,
     }).catch(() => {
       // Hook 失败不影响会话
     });
@@ -368,7 +379,7 @@ export class ChatService {
     try {
       await this.hookEngine.fire("startup", {
         pid: process.pid,
-        cwd: process.cwd(),
+        cwd: this.projectRoot,
         version: this.config.model ?? "unknown",
       });
     } catch {
@@ -478,6 +489,61 @@ export class ChatService {
     return this.teamManager;
   }
 
+  private async createPermissionChecker(cwd: string): Promise<PermissionChecker> {
+    const globalRulesPath = join(getUserCodiaRoot(), "permissions.yaml");
+    const projectRulesPath = join(cwd, ".codia", "permissions.yaml");
+    const localRulesPath = join(cwd, ".codia", "permissions.local.yaml");
+
+    const ruleEngine = new RuleEngine(globalRulesPath, projectRulesPath, localRulesPath);
+    await ruleEngine.load();
+
+    // 当 TUI 未注入回调时，使用静默 auto-allow 而非 createDefaultHumanCallback()
+    // 因为 createDefaultHumanCallback 使用 stdin/stdout，在 Ink 渲染模式下会破坏终端输出
+    const humanCallback = this.humanInTheLoop ?? (async () => "yes" as const);
+    return new PermissionChecker(ruleEngine, this.permissionMode, humanCallback);
+  }
+
+  async createTeam(
+    teamName: string,
+    leadName: string,
+  ): Promise<{ name: string; lead: string }> {
+    const permissionChecker = await this.createPermissionChecker(this.projectRoot);
+    const groupPath = join(getTeamsRoot(), teamName, "group.json");
+    const permission = await permissionChecker.check({
+      toolName: "CreateTeam",
+      toolType: "file",
+      destructive: true,
+      params: {
+        teamName,
+        leadName,
+        filePath: groupPath,
+      },
+      cwd: this.projectRoot,
+      targetPaths: [groupPath],
+      extraAllowedRoots: [getTeamsRoot()],
+    });
+
+    if (permission.decision === "deny") {
+      throw new Error(`权限被拒绝：${permission.reason}`);
+    }
+
+    const team = await createTeamWithLead(this.teamManager, teamName, leadName);
+    return { name: team.name, lead: team.lead };
+  }
+
+  async migrateLegacyWorktrees(): Promise<WorktreeMigrationResult> {
+    const cwd = this.projectRoot;
+    const legacyRoot = getLegacyWorktreesDir(cwd);
+    const targetRoot = getWorktreesDir(cwd);
+
+    if (!directoryHasEntries(legacyRoot)) {
+      return { moved: [], skipped: [] };
+    }
+
+    const ops = new RealGitWorktreeOps(cwd);
+    return migrateLegacyWorktrees(legacyRoot, targetRoot, ops);
+  }
+
   // setupTeamSession —— 为当前会话注册团队协作工具
   // memberName: 当前成员名称，isLead: 是否为 Lead
   async setupTeamSession(
@@ -496,7 +562,7 @@ export class ChatService {
       taskBoard,
       mailbox,
       memberBackend,
-      process.cwd(),
+      this.projectRoot,
     );
 
     // 获取 Lead 名称
@@ -595,18 +661,8 @@ export class ChatService {
     };
 
     // 构建 PermissionChecker（如有 humanInTheLoop 回调或使用默认）
-    const cwd = process.cwd();
-    const globalRulesPath = join(homedir(), ".codia", "permissions.yaml");
-    const projectRulesPath = join(cwd, ".codia", "permissions.yaml");
-    const localRulesPath = join(cwd, ".codia", "permissions.local.yaml");
-
-    const ruleEngine = new RuleEngine(globalRulesPath, projectRulesPath, localRulesPath);
-    await ruleEngine.load();
-
-    // 当 TUI 未注入回调时，使用静默 auto-allow 而非 createDefaultHumanCallback()
-    // 因为 createDefaultHumanCallback 使用 stdin/stdout，在 Ink 渲染模式下会破坏终端输出
-    const humanCallback = this.humanInTheLoop ?? (async () => "yes" as const);
-    const permissionChecker = new PermissionChecker(ruleEngine, this.permissionMode, humanCallback);
+    const cwd = this.projectRoot;
+    const permissionChecker = await this.createPermissionChecker(cwd);
 
     // 本轮 system prompt（激活 Skill 正文 + 基础 prompt + 可选的 plan mode 后缀）
     const systemPrompt = this.mode === "plan"
@@ -645,7 +701,7 @@ export class ChatService {
 
   // scheduleMemoryExtraction —— 自然结束后异步提炼记忆
   private scheduleMemoryExtraction(prevCount: number): void {
-    const projectRoot = process.cwd();
+    const projectRoot = this.projectRoot;
 
     // 读取已有索引
     let existingIndex: MemoryIndexBundle;
@@ -701,11 +757,11 @@ export class ChatService {
     info.push(`操作系统: ${process.platform}`);
     info.push(`Shell: ${process.env.SHELL || "unknown"}`);
     info.push(`日期: ${new Date().toISOString().split("T")[0]}`);
-    info.push(`工作目录: ${process.cwd()}`);
+    info.push(`工作目录: ${this.projectRoot}`);
 
     try {
       const gitBranch = execSync("git branch --show-current", {
-        cwd: process.cwd(),
+        cwd: this.projectRoot,
         encoding: "utf-8",
         timeout: 3000,
       }).trim();

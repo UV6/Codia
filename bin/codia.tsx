@@ -54,11 +54,11 @@ async function main() {
     } else {
       console.log("历史会话：\n");
       for (const s of sessions) {
-        const date = new Date(s.lastMessageTime).toLocaleString("zh-CN");
+        const date = new Date(s.lastActivityAt ?? 0).toLocaleString("zh-CN");
         console.log(`  ${s.id}`);
         console.log(`    消息数: ${s.messageCount}  最后活动: ${date}`);
-        if (s.preview) {
-          console.log(`    预览: ${s.preview}...`);
+        if (s.title) {
+          console.log(`    预览: ${s.title}...`);
         }
         console.log();
       }

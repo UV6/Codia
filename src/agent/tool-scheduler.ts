@@ -56,6 +56,7 @@ export class ToolScheduler {
             destructive: tool.destructive,
             params: call.input,
             cwd: context.cwd,
+            ...tool.buildPermissionRequest?.(call.input, context),
           };
 
           const permResult = await permissionChecker.check(request);

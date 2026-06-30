@@ -6,7 +6,7 @@ import type { WorktreeConfig } from "../../worktree/types.js";
 const config: WorktreeConfig = {
   repoRoot: "/tmp/test-repo",
   baseBranch: "main",
-  worktreesDir: "/tmp/test-repo/.codia/worktrees",
+  worktreesDir: "/tmp/codia-home/projects/test-repo-id/worktrees",
   copyPatterns: [],
   symlinkDirs: [],
 };
@@ -18,7 +18,7 @@ describe("WorktreePath", () => {
       expect(wp.name).toBe("agent-a3f2b1c");
       expect(wp.flatSlug).toBe("agent-a3f2b1c");
       expect(wp.branchName).toBe("worktree-agent-a3f2b1c");
-      expect(wp.fsPath).toBe("/tmp/test-repo/.codia/worktrees/agent-a3f2b1c");
+      expect(wp.fsPath).toBe("/tmp/codia-home/projects/test-repo-id/worktrees/agent-a3f2b1c");
     });
 
     it("接受嵌套名称 sub/agent-x，斜杠替换为 +", () => {
@@ -26,7 +26,7 @@ describe("WorktreePath", () => {
       expect(wp.name).toBe("sub/agent-x");
       expect(wp.flatSlug).toBe("sub+agent-x");
       expect(wp.branchName).toBe("worktree-sub+agent-x");
-      expect(wp.fsPath).toBe("/tmp/test-repo/.codia/worktrees/sub/agent-x");
+      expect(wp.fsPath).toBe("/tmp/codia-home/projects/test-repo-id/worktrees/sub/agent-x");
     });
 
     it("接受只含字母数字的名称", () => {

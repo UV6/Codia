@@ -6,8 +6,15 @@ import {
   readdirSync,
   unlinkSync,
 } from "node:fs";
-import { join, resolve, basename } from "node:path";
+import { join, basename } from "node:path";
 import type { MemoryNote, MemoryIndexEntry, MemoryIndexBundle, MemoryScope } from "./types.js";
+import {
+  getLegacyProjectMemoryDir,
+  getProjectMemoryDir,
+  getUserMemoryDir,
+  migrateDirectoryContents,
+  resolveProjectIdentity,
+} from "../storage/paths.js";
 
 const NOTE_EXT = ".md";
 const INDEX_FILENAME = "MEMORY.md";
@@ -17,10 +24,23 @@ const MAX_INDEX_BYTES = 25_000;
 // getMemoryDir —— 获取用户级或项目级 memory 目录
 export function getMemoryDir(scope: MemoryScope, projectRoot: string): string {
   if (scope === "user") {
-    const home = process.env.HOME ?? "/";
-    return resolve(home, ".codia", "memory");
+    return getUserMemoryDir();
   }
-  return resolve(projectRoot, "memory");
+  const repoRoot = resolveProjectIdentity(projectRoot).repoRoot;
+  return getProjectMemoryDir(repoRoot);
+}
+
+function ensureMemoryMigrated(scope: MemoryScope, projectRoot: string): string {
+  const dir = getMemoryDir(scope, projectRoot);
+  if (scope === "project") {
+    const repoRoot = resolveProjectIdentity(projectRoot).repoRoot;
+    const legacyDir = getLegacyProjectMemoryDir(repoRoot);
+    if (existsSync(legacyDir) && legacyDir !== dir) {
+      migrateDirectoryContents(legacyDir, dir);
+    }
+  }
+  ensureDir(dir);
+  return dir;
 }
 
 function ensureDir(dir: string): void {
@@ -37,7 +57,7 @@ export function loadIndexes(projectRoot: string): MemoryIndexBundle {
 
 // readIndex —— 读取单个 scope 的索引文件
 export function readIndex(scope: MemoryScope, projectRoot: string): MemoryIndexEntry[] {
-  const dir = getMemoryDir(scope, projectRoot);
+  const dir = ensureMemoryMigrated(scope, projectRoot);
   const indexPath = join(dir, INDEX_FILENAME);
   if (!existsSync(indexPath)) return [];
   try {
@@ -54,8 +74,7 @@ export function writeIndex(
   projectRoot: string,
   entries: MemoryIndexEntry[],
 ): void {
-  const dir = getMemoryDir(scope, projectRoot);
-  ensureDir(dir);
+  const dir = ensureMemoryMigrated(scope, projectRoot);
   const indexPath = join(dir, INDEX_FILENAME);
 
   // 裁剪
@@ -78,8 +97,7 @@ export function upsertNote(
   note: MemoryNote,
   projectRoot: string,
 ): void {
-  const dir = getMemoryDir(note.scope, projectRoot);
-  ensureDir(dir);
+  const dir = ensureMemoryMigrated(note.scope, projectRoot);
 
   // 笔记文件以 id.md 存储
   const notePath = join(dir, `${note.id}${NOTE_EXT}`);
@@ -105,7 +123,7 @@ export function upsertNote(
 
 // listNotes —— 列出某个 scope 的所有笔记
 export function listNotes(scope: MemoryScope, projectRoot: string): MemoryNote[] {
-  const dir = getMemoryDir(scope, projectRoot);
+  const dir = ensureMemoryMigrated(scope, projectRoot);
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((f) => f.endsWith(NOTE_EXT))
@@ -121,7 +139,7 @@ export function listNotes(scope: MemoryScope, projectRoot: string): MemoryNote[]
 
 // deleteNote —— 删除单条笔记
 export function deleteNote(noteId: string, scope: MemoryScope, projectRoot: string): void {
-  const dir = getMemoryDir(scope, projectRoot);
+  const dir = ensureMemoryMigrated(scope, projectRoot);
   const notePath = join(dir, `${noteId}${NOTE_EXT}`);
   if (existsSync(notePath)) unlinkSync(notePath);
   // 重建索引
