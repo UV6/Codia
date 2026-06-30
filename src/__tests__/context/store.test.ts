@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { saveResult, loadResult } from "../../context/store.js";
 import { existsSync, rmSync, readFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const TEST_SESSION_ID = "test-store-2026-06-16";
-const CONTEXT_DIR = join(homedir(), ".Codia", "context");
+const previousCodiaHome = process.env.CODIA_HOME;
+const CONTEXT_DIR = join(tmpdir(), "codia-context-store-test", ".codia", "context");
 
 describe("ContextStore", () => {
   beforeAll(() => {
+    process.env.CODIA_HOME = join(tmpdir(), "codia-context-store-test", ".codia");
     // 确保测试目录存在
     mkdirSync(join(CONTEXT_DIR, TEST_SESSION_ID), { recursive: true });
   });
@@ -18,6 +20,11 @@ describe("ContextStore", () => {
     const testDir = join(CONTEXT_DIR, TEST_SESSION_ID);
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
+    }
+    if (previousCodiaHome === undefined) {
+      delete process.env.CODIA_HOME;
+    } else {
+      process.env.CODIA_HOME = previousCodiaHome;
     }
   });
 

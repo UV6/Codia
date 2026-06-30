@@ -19,7 +19,7 @@ Agent 调用时与内置工具无感。
 2. 支持本地子进程（stdio）和远程 HTTP（Streamable HTTP）两种传输方式
 3. 用适配层把 MCP 工具包装成标准的 `Tool` 接口，Agent 调用远程工具和调用内置工具体验一致
 4. 多个 MCP Server 的崩溃互不影响——一个挂了不影响其他 Server 的工具正常运行
-5. 配置文件按用户级（`~/.Codia/Codia.yml`）和项目级（`.codia/config.yml`）两层合并
+5. 配置文件按用户级（`~/.codia/Codia.yml`）和项目级（`.codia/config.yml`）两层合并
 
 ## 功能需求
 
@@ -41,7 +41,7 @@ Agent 调用时与内置工具无感。
         Authorization: "Bearer ${WEATHER_API_KEY}"
   ```
 
-- **F2: 两层配置合并** —— 启动时先读用户级配置（`~/.Codia/Codia.yml`），再读项目级配置（`.codia/config.yml`）。项目级中声明的同名 Server 覆盖用户级定义，项目级独有的 Server 追加，用户级独有的 Server 保留。
+- **F2: 两层配置合并** —— 启动时先读用户级配置（`~/.codia/Codia.yml`），再读项目级配置（`.codia/config.yml`）。项目级中声明的同名 Server 覆盖用户级定义，项目级独有的 Server 追加，用户级独有的 Server 保留。
 
 - **F3: JSON-RPC 2.0 消息收发** —— 底层按 JSON-RPC 2.0 规范收发消息。每条请求带唯一 id，响应回包用相同 id 关联。通知类消息（无 id）不发响应。支持错误回包，校验 code 字段。
 

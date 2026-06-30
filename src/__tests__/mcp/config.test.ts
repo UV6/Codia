@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { expandEnvVars, validateServerConfig } from "../../mcp/config.js";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { expandEnvVars, validateServerConfig, getUserConfigPath } from "../../mcp/config.js";
 
 // config.test.ts 只测试 expandEnvVars 和校验逻辑（纯函数，不依赖文件系统）
 // 完整配置读取/合并的集成测试在 E2E 场景中验证
 
 describe("expandEnvVars", () => {
+  it("用户级配置路径使用 ~/.codia 目录", () => {
+    expect(getUserConfigPath()).toBe(join(homedir(), ".codia", "Codia.yml"));
+  });
+
   beforeEach(() => {
     process.env.TEST_VAR = "hello";
     process.env.TEST_EMPTY = "";

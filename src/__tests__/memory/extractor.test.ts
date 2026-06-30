@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, rmSync } from "node:fs";
@@ -66,12 +66,30 @@ const messages: Message[] = [
 
 describe("extractFromTurn (text JSON)", () => {
   const projectRoot = join(tmpdir(), "codia-memory-ext-test");
+  const previousCodiaHome = process.env.CODIA_HOME;
+  let testCodiaHome = join(tmpdir(), "codia-memory-extractor-home", ".codia");
+
+  beforeAll(() => {
+    process.env.CODIA_HOME = testCodiaHome;
+  });
+
+  afterAll(() => {
+    try { rmSync(join(tmpdir(), "codia-memory-extractor-home"), { recursive: true, force: true }); } catch {}
+    if (previousCodiaHome === undefined) {
+      delete process.env.CODIA_HOME;
+    } else {
+      process.env.CODIA_HOME = previousCodiaHome;
+    }
+  });
 
   function cleanup() {
     try { rmSync(projectRoot, { recursive: true, force: true }); } catch {}
+    try { rmSync(join(testCodiaHome, ".."), { recursive: true, force: true }); } catch {}
   }
   function setup() {
     cleanup();
+    testCodiaHome = join(tmpdir(), `codia-memory-extractor-home-${Date.now()}`, ".codia");
+    process.env.CODIA_HOME = testCodiaHome;
     mkdirSync(projectRoot, { recursive: true });
   }
 

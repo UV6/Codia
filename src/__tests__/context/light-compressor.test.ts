@@ -1,12 +1,15 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { compressResult, compressBatch } from "../../context/light-compressor.js";
 import { existsSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ToolResult } from "../../tool/types.js";
 
 const TEST_SESSION = "test-light-compressor";
-const CONTEXT_DIR = join(homedir(), ".Codia", "context");
+const previousCodiaHome = process.env.CODIA_HOME;
+const CONTEXT_DIR = join(tmpdir(), "codia-light-compressor-test", ".codia", "context");
+
+process.env.CODIA_HOME = join(tmpdir(), "codia-light-compressor-test", ".codia");
 
 function makeResult(content: string): ToolResult {
   return { status: "success", content };
@@ -18,6 +21,11 @@ describe("LightCompressor", () => {
     const testDir = join(CONTEXT_DIR, TEST_SESSION);
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
+    }
+    if (previousCodiaHome === undefined) {
+      delete process.env.CODIA_HOME;
+    } else {
+      process.env.CODIA_HOME = previousCodiaHome;
     }
   });
 

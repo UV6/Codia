@@ -1,12 +1,12 @@
 import { readFileSync, existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
 import type { McpConfig, McpServerConfig } from "./types.js";
+import { getUserCodiaRoot } from "../storage/paths.js";
 
 // getUserConfigPath —— 用户级配置文件默认路径
 export function getUserConfigPath(): string {
-  return join(homedir(), ".Codia", "Codia.yml");
+  return join(getUserCodiaRoot(), "Codia.yml");
 }
 
 // getProjectConfigPath —— 项目级配置文件默认路径

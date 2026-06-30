@@ -1,12 +1,28 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { buildNewSessionContext, buildResumeContext } from "../../bootstrap/context-builder.js";
 import { appendMessage } from "../../chat/history.js";
+import { sessionPath } from "../../chat/history.js";
 
 describe("context-builder", () => {
   const projectRoot = join(tmpdir(), "codia-bootstrap-test");
+  const previousCodiaHome = process.env.CODIA_HOME;
+  const testCodiaHome = join(tmpdir(), "codia-bootstrap-home", ".codia");
+
+  beforeAll(() => {
+    process.env.CODIA_HOME = testCodiaHome;
+  });
+
+  afterAll(() => {
+    try { rmSync(join(tmpdir(), "codia-bootstrap-home"), { recursive: true, force: true }); } catch {}
+    if (previousCodiaHome === undefined) {
+      delete process.env.CODIA_HOME;
+    } else {
+      process.env.CODIA_HOME = previousCodiaHome;
+    }
+  });
 
   function cleanup() {
     try { rmSync(projectRoot, { recursive: true, force: true }); } catch {}
@@ -78,7 +94,7 @@ describe("context-builder", () => {
     expect(ctx.recoveredMessages.length).toBe(2);
     expect(ctx.sessionSummary).toBeDefined();
     expect(ctx.sessionSummary!.id).toBe("20260618-223209-c109");
-    expect(ctx.sessionSummary!.path).toBe(fp);
+    expect(ctx.sessionSummary!.path).toBe(sessionPath("20260618-223209-c109", projectRoot));
     expect(ctx.sessionSummary!.messageCount).toBe(2);
     expect(ctx.sessionSummary!.title).toBe("hello");
     expect(ctx.sessionSummary!.recoverable).toBe(true);

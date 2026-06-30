@@ -1,10 +1,14 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-import { loadConfig, loadAppConfig, ConfigError } from "../config/index.js";
+import { loadConfig, loadAppConfig, ConfigError, DEFAULT_CONFIG_PATH } from "../config/index.js";
 
 describe("loadConfig", () => {
+  it("默认配置路径使用 ~/.codia 目录", () => {
+    expect(DEFAULT_CONFIG_PATH).toBe(join(homedir(), ".codia", "Codia.yml"));
+  });
+
   it("正确读取有效 YAML 配置", () => {
     const config = loadConfig();
     expect(config.protocol).toBeTruthy();

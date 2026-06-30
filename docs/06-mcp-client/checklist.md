@@ -33,7 +33,7 @@
 
 ## 端到端场景
 
-- [ ] 场景 1（stdio 工具注册 + 调用）：在 `~/.Codia/Codia.yml` 中配置一个本地 stdio Server，启动 Codia，检查日志输出 "已连接，注册 N 个工具"，然后让 Agent 调用该工具，观察返回结果正常
+- [ ] 场景 1（stdio 工具注册 + 调用）：在 `~/.codia/Codia.yml` 中配置一个本地 stdio Server，启动 Codia，检查日志输出 "已连接，注册 N 个工具"，然后让 Agent 调用该工具，观察返回结果正常
 - [ ] 场景 2（HTTP 工具注册）：配置一个 HTTP MCP Server，启动 Codia，检查日志输出连接成功，工具列表中出现对应的 `serverName_toolName`
 - [ ] 场景 3（两层合并）：用户级配 Server A 和 B，项目级覆盖 A 的 url 并新增 C，启动 Codia，检查日志显示合并后结果为 A'、B、C
 - [ ] 场景 4（坏 Server 隔离）：配置一个正常 Server 和一个坏 Server（如 command 指向不存在的路径），启动 Codia，正常 Server 的工具可调用，坏 Server 只打印错误日志，不影响其他

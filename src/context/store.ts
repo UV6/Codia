@@ -1,9 +1,11 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { getUserCodiaRoot } from "../storage/paths.js";
 
-// CONTEXT_DIR —— 上下文压缩文件根目录
-const CONTEXT_DIR = join(homedir(), ".Codia", "context");
+// getContextDir —— 上下文压缩文件根目录
+function getContextDir(): string {
+  return join(getUserCodiaRoot(), "context");
+}
 
 // ensureDir —— 递归创建目录
 function ensureDir(dir: string): void {
@@ -22,7 +24,7 @@ export function saveResult(
   content: string,
   meta: { type: string; timestamp: string },
 ): string {
-  const dir = join(CONTEXT_DIR, sessionId);
+  const dir = join(getContextDir(), sessionId);
   ensureDir(dir);
 
   // ISO 8601 格式时间戳保证文件名可排序

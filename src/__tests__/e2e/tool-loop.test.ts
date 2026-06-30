@@ -1,8 +1,27 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { rmSync } from "node:fs";
 import { loadConfig } from "../../config/index.js";
 import { ChatService } from "../../chat/chat-service.js";
 
+const previousCodiaHome = process.env.CODIA_HOME;
+const testCodiaHome = join(tmpdir(), "codia-e2e-tool-loop-home", ".codia");
+
 describe("E2E: 工具调用循环", () => {
+  beforeAll(() => {
+    process.env.CODIA_HOME = testCodiaHome;
+  });
+
+  afterAll(() => {
+    try { rmSync(join(tmpdir(), "codia-e2e-tool-loop-home"), { recursive: true, force: true }); } catch {}
+    if (previousCodiaHome === undefined) {
+      delete process.env.CODIA_HOME;
+    } else {
+      process.env.CODIA_HOME = previousCodiaHome;
+    }
+  });
+
   // 跳过此测试需要 API key 才能运行
   const SKIP_REASON = configNotAvailable();
 
@@ -66,6 +85,9 @@ describe("E2E: 工具调用循环", () => {
 });
 
 function configNotAvailable(): string | null {
+  if (process.env.CODIA_RUN_E2E !== "1") {
+    return "SKIP: 未启用 E2E";
+  }
   try {
     const config = loadConfig();
     if (config.apiKey === "YOUR_API_KEY_HERE") {

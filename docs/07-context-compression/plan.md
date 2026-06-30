@@ -32,7 +32,7 @@
 - **TokenEstimator** — token 近似估算。维护上次 API 返回的 `inputTokens` 锚点 + 增量消息字符数 ÷ 4
 - **LightCompressor** — 轻量预防（F1-F3）。字符串操作 + 文件 I/O，超大工具结果存盘替换为预览
 - **HeavyCompressor** — 重量兜底（F4-F10）。调 LLM 生成摘要，管理熔断计数
-- **ContextStore** — 持久化。被截断的工具结果和摘要写入 `~/.Codia/context/`
+- **ContextStore** — 持久化。被截断的工具结果和摘要写入 `~/.codia/context/`
 
 入口统一为 **ContextManager**，对外暴露两个方法：`preRequest(messages, mode)`（重量检查）和 `compressToolResults(results)`（轻量检查）。
 
@@ -184,7 +184,7 @@ function loadResult(filePath: string): string;
 
 ### ContextStore
 
-**职责：** 纯文件 I/O。将截断的工具结果或摘要写入 `~/.Codia/context/<sessionId>/` 目录。
+**职责：** 纯文件 I/O。将截断的工具结果或摘要写入 `~/.codia/context/<sessionId>/` 目录。
 
 **对外接口：**
 - `saveResult(sessionId, content, meta)` — 写入文件，返回文件路径
@@ -269,7 +269,7 @@ src/chat/chat-service.ts  — 修改：解析 /compress 命令，初始化 Conte
 | 摘要用相同模型 | 复用当前配置的 provider/model | spec 明确不做模型选择优化；摘要请求不带工具，成本略低于常规 API 调用 |
 | 摘要请求不做 tool_use | 构造不带 `tools` 参数的 API 请求 | spec 要求禁止模型调工具，最简单的方式是从请求中移除 tools 数组 |
 | 锚点估算策略 | 每次 API 返回后更新锚点、增量按字符数估算 | 锚点（API 真实计数值）是最高精度的参考点，增量用字符数估算误差可控且实现成本低 |
-| 上下文文件存储 | `~/.Codia/context/<session-id>/` | 与现有 `~/.Codia/sessions/` 平级，按会话隔离 |
+| 上下文文件存储 | `~/.codia/context/<session-id>/` | 与现有 `~/.codia/sessions/` 平级，按会话隔离 |
 | `/compress` 命令 | 复用 `ChatService` 的命令解析模式 | 已有 `/plan`、`/default` 等命令解析，统一风格 |
 | 压缩事件 | 新增 `compress` 事件类型 yield 给上层 | 沿袭现有 `tool_result`、`round_start` 等事件模式 |
 | 保留窗口计算 | 从 tail 往回逐条累加 token 估算值 | O(n) 单次遍历，简单可靠 |

@@ -112,7 +112,7 @@
 **依赖：** T1（types.ts）以及 `src/config/index.ts`
 **步骤：**
 1. 实现 `loadMcpConfig(userConfigPath?, projectConfigPath?): McpConfig`
-   - `userConfigPath` 默认 `~/.Codia/Codia.yml`
+   - `userConfigPath` 默认 `~/.codia/Codia.yml`
    - `projectConfigPath` 默认 `<cwd>/.codia/config.yml`
    - 读用户级 YAML，取 `mcp_servers` 段
    - 如果存在项目级配置文件，读项目级 YAML，取 `mcp_servers` 段

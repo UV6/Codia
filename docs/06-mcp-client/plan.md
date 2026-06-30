@@ -144,7 +144,7 @@ class McpToolAdapter implements Tool {
 4. **统一在此处执行 `${VAR}` 环境变量展开**——Transport 层接收已展开的最终值，不自行展开
 
 **对外接口：** `loadMcpConfig(userConfigPath?: string, projectConfigPath?: string): McpConfig`
-- `userConfigPath` 默认 `~/.Codia/Codia.yml`
+- `userConfigPath` 默认 `~/.codia/Codia.yml`
 - `projectConfigPath` 默认 `process.cwd()/.codia/config.yml`
 
 **依赖：** `src/config/index.ts` 的 `loadAppConfig`、yaml 解析

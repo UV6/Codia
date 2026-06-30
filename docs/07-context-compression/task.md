@@ -32,7 +32,7 @@
 **文件：** `src/context/store.ts`
 **依赖：** T1
 **步骤：**
-1. 实现 `saveResult(sessionId, content, meta)` — 写入 `~/.Codia/context/<sessionId>/result_<timestamp>.json`（时间戳格式用 ISO 8601 可排序形式，如 `2026-06-16T10-30-00Z`）
+1. 实现 `saveResult(sessionId, content, meta)` — 写入 `~/.codia/context/<sessionId>/result_<timestamp>.json`（时间戳格式用 ISO 8601 可排序形式，如 `2026-06-16T10-30-00Z`）
 2. 文件内容为 JSON：`{ meta, content }`，`meta` 含 `type` 和 `timestamp`
 3. 自动创建目录（`mkdirSync recursive`）
 4. 返回写入的绝对路径
