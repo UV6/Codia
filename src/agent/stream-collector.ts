@@ -60,6 +60,7 @@ export class StreamCollector {
       case "thinking":
       case "tool_use_start":
       case "tool_input_delta":
+      case "openai_tool_delta":
       case "tool_status":
       case "done":
         break;

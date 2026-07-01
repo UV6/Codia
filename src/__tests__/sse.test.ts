@@ -56,6 +56,36 @@ describe("mapToChunk", () => {
     expect(result).toEqual({ type: "text", content: "你好" });
   });
 
+  it("解析 OpenAI tool_calls delta", () => {
+    const data = {
+      choices: [{
+        delta: {
+          tool_calls: [{
+            index: 0,
+            id: "call_1",
+            type: "function",
+            function: {
+              name: "LoadSkill",
+              arguments: "{\"name\":\"review\"}",
+            },
+          }],
+        },
+        index: 0,
+        finish_reason: null,
+      }],
+    };
+    const result = mapToChunk(data);
+    expect(result).toEqual({
+      type: "openai_tool_delta",
+      deltas: [{
+        index: 0,
+        id: "call_1",
+        name: "LoadSkill",
+        arguments: "{\"name\":\"review\"}",
+      }],
+    });
+  });
+
   it("解析 OpenAI finish_reason=stop + usage", () => {
     const data = {
       choices: [{ delta: {}, index: 0, finish_reason: "stop" }],
@@ -135,5 +165,40 @@ describe("parseSSEStream", () => {
     }
     // 已经中断，会 yield done
     expect(chunks.some((c) => c.type === "done")).toBe(true);
+  });
+
+  it("解析 OpenAI tool_calls SSE 流", async () => {
+    const event = `data: ${JSON.stringify({
+      choices: [{
+        delta: {
+          tool_calls: [{
+            index: 0,
+            id: "call_1",
+            type: "function",
+            function: {
+              name: "LoadSkill",
+              arguments: "{\"name\":\"review\"}",
+            },
+          }],
+        },
+        index: 0,
+        finish_reason: null,
+      }],
+    })}\n\n`;
+    const stream = stringToStream(event);
+    const controller = new AbortController();
+    const chunks = [];
+    for await (const chunk of parseSSEStream(stream, controller.signal)) {
+      chunks.push(chunk);
+    }
+    expect(chunks).toEqual([{
+      type: "openai_tool_delta",
+      deltas: [{
+        index: 0,
+        id: "call_1",
+        name: "LoadSkill",
+        arguments: "{\"name\":\"review\"}",
+      }],
+    }]);
   });
 });

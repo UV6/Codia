@@ -178,6 +178,22 @@ export function mapToChunk(data: Record<string, unknown>): Chunk | null {
     if (!choice) return { type: "done" };
 
     const delta = choice.delta as Record<string, unknown> | undefined;
+    const toolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+    if (toolCalls && toolCalls.length > 0) {
+      return {
+        type: "openai_tool_delta",
+        deltas: toolCalls.map((toolCall) => {
+          const fn = toolCall.function as Record<string, unknown> | undefined;
+          return {
+            index: (toolCall.index as number) ?? 0,
+            id: toolCall.id as string | undefined,
+            name: fn?.name as string | undefined,
+            arguments: fn?.arguments as string | undefined,
+          };
+        }),
+      };
+    }
+
     if (delta?.content) {
       return { type: "text", content: delta.content as string };
     }

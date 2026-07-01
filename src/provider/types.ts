@@ -41,7 +41,16 @@ export type Chunk =
   | { type: "tool_use"; call: ToolCall }
   | { type: "tool_status"; name: string; param: string }
   | { type: "tool_use_start"; id: string; name: string }
-  | { type: "tool_input_delta"; partialJson: string };
+  | { type: "tool_input_delta"; partialJson: string }
+  | {
+    type: "openai_tool_delta";
+    deltas: Array<{
+      index: number;
+      id?: string;
+      name?: string;
+      arguments?: string;
+    }>;
+  };
 
 // LLMProvider —— 统一的后端抽象接口
 export interface LLMProvider {
