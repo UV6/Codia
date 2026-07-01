@@ -28,6 +28,12 @@
 npm install -g codia-cli
 ```
 
+### 从 npm 卸载
+
+```bash
+npm  uninstall -g codia-cli
+```
+
 ### 从本地打包产物安装
 
 ```bash

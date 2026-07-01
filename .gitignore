@@ -20,3 +20,6 @@ files/
 .agents/
 .pnpm-store/
 .codia/
+docs/15-packaging-distribution/knowledge.md
+.gitignore
+codia-0.1.0.tgz
