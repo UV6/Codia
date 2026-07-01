@@ -218,11 +218,11 @@ export class SubAgentRunner {
           if (!info.isClean || info.commitCountAhead > 0) {
             // 有变更 → 保留 worktree
             await worktreeManager.exit(worktreeName, { keep: true });
-            console.log(`[SubAgentRunner] Worktree 有变更，保留：${info.path}`);
+            console.error(`[SubAgentRunner] Worktree 有变更，保留：${info.path}`);
           } else {
             // 无变更 → 自动清理
             await worktreeManager.exit(worktreeName, { force: true });
-            console.log(`[SubAgentRunner] Worktree 无变更，已清理：${info.path}`);
+            console.error(`[SubAgentRunner] Worktree 无变更，已清理：${info.path}`);
           }
         } catch (e) {
           console.error(`[SubAgentRunner] Worktree 清理失败：${(e as Error).message}`);

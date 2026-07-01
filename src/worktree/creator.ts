@@ -27,7 +27,7 @@ export class WorktreeCreator {
       try {
         const trees = await this.ops.listWorktrees();
         if (trees.some((t) => t === wp.fsPath)) {
-          console.log(`[WorktreeCreator] 目录已存在，复用：${wp.fsPath}`);
+          console.error(`[WorktreeCreator] 目录已存在，复用：${wp.fsPath}`);
           return this.buildInfo(wp);
         }
       } catch {
@@ -85,7 +85,7 @@ export class WorktreeCreator {
         } else {
           appendFileSync(gitignorePath, `${line}\n`);
         }
-        console.log("[WorktreeCreator] 已将 .codia/ 加入 .gitignore");
+        console.error("[WorktreeCreator] 已将 .codia/ 加入 .gitignore");
       } catch (e) {
         console.warn(`[WorktreeCreator] 无法更新 .gitignore：${(e as Error).message}`);
       }
@@ -97,7 +97,7 @@ export class WorktreeCreator {
     try {
       await this.ops.removeWorktree(wp.fsPath, true);
       await this.ops.deleteBranch(wp.branchName);
-      console.log(`[WorktreeCreator] 回滚成功：${wp.fsPath}`);
+      console.error(`[WorktreeCreator] 回滚成功：${wp.fsPath}`);
     } catch (e) {
       console.error(
         `[WorktreeCreator] 严重错误：回滚失败，worktree 可能处于损坏状态。` +
@@ -109,7 +109,7 @@ export class WorktreeCreator {
         execFileSync("git", ["worktree", "prune"], {
           cwd: this.config.repoRoot,
         });
-        console.log("[WorktreeCreator] git worktree prune 已执行");
+        console.error("[WorktreeCreator] git worktree prune 已执行");
       } catch {
         // prune 也失败，放弃
       }

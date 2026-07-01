@@ -10,6 +10,7 @@ import { InfoBar } from "./info-bar.js";
 import { StartupBanner } from "./startup-banner.js";
 import { MessageQueue } from "./message-queue.js";
 import { getReplyStatusLabel } from "./reply-status.js";
+import { StreamBuffer } from "./stream-buffer.js";
 import pkg from "../../package.json" with { type: "json" };
 import type { Message } from "../provider/types.js";
 import type { ChatService } from "../chat/chat-service.js";
@@ -59,6 +60,7 @@ export function App({ service, showPet }: AppProps) {
   // 工具结果展开/折叠状态
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const messageQueueRef = useRef(new MessageQueue());
+  const streamBufferRef = useRef<StreamBuffer | null>(null);
 
   const syncQueuedMessages = useCallback(() => {
     setQueuedMessages(messageQueueRef.current.snapshot());
@@ -136,6 +138,11 @@ export function App({ service, showPet }: AppProps) {
     let fullContent = "";
     let fullThinking = "";
     let thinkingAutoCollapsed = false;
+    const streamBuffer = new StreamBuffer(({ content, thinking }) => {
+      setStreamingContent(content);
+      setStreamingThinking(thinking);
+    });
+    streamBufferRef.current = streamBuffer;
 
     try {
       for await (const chunk of service.sendMessage(text)) {
@@ -147,11 +154,11 @@ export function App({ service, showPet }: AppProps) {
               thinkingAutoCollapsed = true;
             }
             fullContent += chunk.content;
-            setStreamingContent(fullContent);
+            streamBuffer.appendText(chunk.content);
             break;
           case "thinking":
             fullThinking += chunk.content;
-            setStreamingThinking(fullThinking);
+            streamBuffer.appendThinking(chunk.content);
             break;
           case "usage":
             setUsage((prev) => ({
@@ -186,12 +193,18 @@ export function App({ service, showPet }: AppProps) {
             setMessages(service.history);
             setStreamingContent("");
             setStreamingThinking("");
+            streamBuffer.dispose();
+            streamBufferRef.current = null;
             break;
         }
       }
     } catch (err) {
       setError((err as Error).message);
     } finally {
+      streamBuffer.dispose();
+      if (streamBufferRef.current === streamBuffer) {
+        streamBufferRef.current = null;
+      }
       setIsStreaming(false);
     }
   }, [service]);
@@ -309,6 +322,13 @@ export function App({ service, showPet }: AppProps) {
   useEffect(() => {
     service.setHumanInTheLoop(humanInTheLoop);
   }, [service, humanInTheLoop]);
+
+  useEffect(() => {
+    return () => {
+      streamBufferRef.current?.dispose();
+      streamBufferRef.current = null;
+    };
+  }, []);
 
 
   // 权限确认按键处理（只在权限弹窗激活时）

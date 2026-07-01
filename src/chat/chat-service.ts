@@ -732,10 +732,10 @@ export class ChatService {
     )
       .then(({ upserted, deleted }) => {
         if (upserted.length > 0) {
-          console.log(`[MemoryExtractor] 提炼记忆 ${upserted.length} 条：${upserted.map((n) => n.title).join(", ")}`);
+          console.error(`[MemoryExtractor] 提炼记忆 ${upserted.length} 条：${upserted.map((n) => n.title).join(", ")}`);
         }
         if (deleted.length > 0) {
-          console.log(`[MemoryExtractor] 删除记忆 ${deleted.length} 条：${deleted.join(", ")}`);
+          console.error(`[MemoryExtractor] 删除记忆 ${deleted.length} 条：${deleted.join(", ")}`);
         }
       })
       .catch((e) => {

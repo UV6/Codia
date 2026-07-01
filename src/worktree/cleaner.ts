@@ -97,7 +97,7 @@ export class WorktreeCleaner {
           }
         }
         cleaned.push(entry);
-        console.log(`[WorktreeCleaner] 已清理：${entry}（分支：${branchName}）`);
+        console.error(`[WorktreeCleaner] 已清理：${entry}（分支：${branchName}）`);
       } catch (e) {
         skipped.push({
           name: entry,

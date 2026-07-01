@@ -144,7 +144,7 @@ export class WorktreeInitializer {
       const resolved = join(repoRoot, hooksPath);
       if (existsSync(resolved)) {
         hooksSourceDir = resolved;
-        console.log(`[WorktreeInitializer] 使用 core.hooksPath: ${resolved}`);
+        console.error(`[WorktreeInitializer] 使用 core.hooksPath: ${resolved}`);
       }
     }
 
@@ -195,7 +195,7 @@ export class WorktreeInitializer {
             // 跳过个别文件复制失败
           }
         }
-        console.log(`[WorktreeInitializer] hooks 目录已复制: ${targetHooksDir}`);
+        console.error(`[WorktreeInitializer] hooks 目录已复制: ${targetHooksDir}`);
       } catch {
         console.warn("[WorktreeInitializer] hooks 复制失败，跳过");
       }
@@ -212,7 +212,7 @@ export class WorktreeInitializer {
 
       try {
         symlinkSync(src, dest, "dir");
-        console.log(`[WorktreeInitializer] 软链接已创建: ${dest} → ${src}`);
+        console.error(`[WorktreeInitializer] 软链接已创建: ${dest} → ${src}`);
       } catch {
         // symlink 失败，回退到复制
         console.warn(`[WorktreeInitializer] 软链接失败，回退到复制：${dir}`);

@@ -35,9 +35,9 @@ export class WorktreeManager {
   // enter —— 创建 worktree 并返回 cwd 路径
   async enter(name: string): Promise<{ cwd: string; info: WorktreeInfo }> {
     const wp = WorktreePath.validate(name, this.config);
-    console.log(`[WorktreeManager] 进入 worktree: ${name} (${wp.fsPath})`);
+    console.error(`[WorktreeManager] 进入 worktree: ${name} (${wp.fsPath})`);
     const info = await this.creator.create(wp);
-    console.log(`[WorktreeManager] worktree 就绪: ${info.path}`);
+    console.error(`[WorktreeManager] worktree 就绪: ${info.path}`);
     return { cwd: info.path, info };
   }
 
@@ -55,11 +55,11 @@ export class WorktreeManager {
     }
 
     const info = await this.buildInfo(wp);
-    console.log(`[WorktreeManager] 退出 worktree: ${name}`);
+    console.error(`[WorktreeManager] 退出 worktree: ${name}`);
 
     // keep 模式：仅标记，不改文件系统
     if (options?.keep) {
-      console.log(`[WorktreeManager] worktree 保留: ${info.path}`);
+      console.error(`[WorktreeManager] worktree 保留: ${info.path}`);
       return { action: "kept", path: info.path, info };
     }
 
@@ -90,7 +90,7 @@ export class WorktreeManager {
       console.warn(`[WorktreeManager] 删除分支失败：${info.branch}，目录已移除`);
     }
 
-    console.log(`[WorktreeManager] worktree 已删除: ${info.path}`);
+    console.error(`[WorktreeManager] worktree 已删除: ${info.path}`);
     return { action: "removed", path: info.path, info };
   }
 
@@ -103,7 +103,7 @@ export class WorktreeManager {
       throw new WorktreeNotFoundError(name);
     }
 
-    console.log(`[WorktreeManager] 强制删除 worktree: ${name}`);
+    console.error(`[WorktreeManager] 强制删除 worktree: ${name}`);
     await this.ops.removeWorktree(wp.fsPath, force);
     try {
       await this.ops.deleteBranch(wp.branchName);
