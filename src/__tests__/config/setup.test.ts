@@ -28,12 +28,11 @@ class FakePrompter implements SetupPrompter {
 }
 
 describe("config setup", () => {
-  it("提供 OpenAI、Anthropic、DeepSeek 三种预设", () => {
+  it("提供 OpenAI、Anthropic 两种预设", () => {
     const presets = getSetupPresets();
-    expect(presets.map((preset) => preset.id)).toEqual(["openai", "anthropic", "deepseek"]);
+    expect(presets.map((preset) => preset.id)).toEqual(["openai", "anthropic"]);
     expect(presets[0].defaultModel).toBe("gpt-5.4");
     expect(presets[1].defaultModel).toBe("claude-opus-4-6");
-    expect(presets[2].defaultModel).toBe("deepseek-v4-flash");
   });
 
   it("把配置渲染为项目约定的 YAML 格式", () => {
@@ -57,18 +56,18 @@ describe("config setup", () => {
 
   it("根据问答结果写入配置文件", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "codia-setup-")), "Codia.yml");
-    const preset = getSetupPresets().find((item) => item.id === "deepseek");
+    const preset = getSetupPresets().find((item) => item.id === "openai");
     const result = await runConfigSetup(
       path,
-      new FakePrompter(preset!, ["", "", "deepseek-key"]),
+      new FakePrompter(preset!, ["", "", "openai-key"]),
     );
 
     expect(result.config).toEqual({
       protocol: "openai",
-      model: "deepseek-v4-flash",
-      baseUrl: "https://api.deepseek.com",
-      apiKey: "deepseek-key",
+      model: "gpt-5.4",
+      baseUrl: "https://api.openai.com",
+      apiKey: "openai-key",
     });
-    expect(readFileSync(path, "utf-8")).toContain("model: deepseek-v4-flash");
+    expect(readFileSync(path, "utf-8")).toContain("model: gpt-5.4");
   });
 });

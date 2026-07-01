@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { createInterface } from "node:readline/promises";
 import type { ChatConfig } from "../provider/types.js";
 
-export type SetupPresetId = "openai" | "anthropic" | "deepseek";
+export type SetupPresetId = "openai" | "anthropic";
 
 export interface SetupPreset {
   id: SetupPresetId;
@@ -42,14 +42,6 @@ const SETUP_PRESETS: SetupPreset[] = [
     protocol: "anthropic",
     defaultModel: "claude-opus-4-6",
     defaultBaseUrl: "https://api.anthropic.com",
-  },
-  {
-    id: "deepseek",
-    label: "DeepSeek (OpenAI 兼容)",
-    description: "适用于 DeepSeek 官方 API",
-    protocol: "openai",
-    defaultModel: "deepseek-v4-flash",
-    defaultBaseUrl: "https://api.deepseek.com",
   },
 ];
 

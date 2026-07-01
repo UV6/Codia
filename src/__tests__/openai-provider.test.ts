@@ -18,8 +18,8 @@ function stringToStream(...chunks: string[]): ReadableStream<Uint8Array> {
 describe("OpenAIProvider", () => {
   const config: ChatConfig = {
     protocol: "openai",
-    model: "deepseek-v4-flash",
-    baseUrl: "https://api.deepseek.com",
+    model: "gpt-5.4",
+    baseUrl: "https://api.openai.com",
     apiKey: "test-key",
   };
 
@@ -34,7 +34,7 @@ describe("OpenAIProvider", () => {
       expect(body).toBeTruthy();
       const parsed = JSON.parse(body);
 
-      expect(parsed.model).toBe("deepseek-v4-flash");
+      expect(parsed.model).toBe("gpt-5.4");
       expect(parsed.stream).toBe(true);
       expect(parsed.stream_options).toEqual({ include_usage: true });
       expect(parsed.tool_choice).toBe("auto");
