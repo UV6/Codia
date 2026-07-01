@@ -23,6 +23,20 @@ interface StatusConfig {
   label: string;
   color: string;
 }
+
+export function formatAgentRoleLabel(agentRoleCount: number): string {
+  return `Agent×${agentRoleCount}`;
+}
+
+const MAX_SESSION_FILE_LENGTH = 24;
+
+export function formatSessionFileLabel(sessionFile: string): string {
+  if (sessionFile.length <= MAX_SESSION_FILE_LENGTH) {
+    return `📁 ${sessionFile}`;
+  }
+  return `📁 ${sessionFile.slice(0, MAX_SESSION_FILE_LENGTH)}…`;
+}
+
 function getStatusConfig(permMode: string): StatusConfig {
   switch (permMode) {
     case "bypassPermissions":
@@ -95,9 +109,10 @@ export function InfoBar({
           <Text dimColor>🎯 Skills×{skillCount}</Text>
         )}
         <Text>  </Text>
-        <Text dimColor>🏗️ Agents×{agentRoleCount}</Text>
+        <Text dimColor>🏗️ </Text>
+        <Text dimColor>{formatAgentRoleLabel(agentRoleCount)}</Text>
         <Text>  </Text>
-        <Text dimColor>📁 {sessionFile}</Text>
+        <Text dimColor>{formatSessionFileLabel(sessionFile)}</Text>
       </Box>
 
       {/* 第三行：快捷键提示 */}
