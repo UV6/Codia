@@ -8,6 +8,8 @@ import { ThinkingBox } from "./thinking-box.js";
 import { PhasePanel } from "./phase-panel.js";
 import { InfoBar } from "./info-bar.js";
 import { StartupBanner } from "./startup-banner.js";
+import { MessageQueue } from "./message-queue.js";
+import { getReplyStatusLabel } from "./reply-status.js";
 import pkg from "../../package.json" with { type: "json" };
 import type { Message } from "../provider/types.js";
 import type { ChatService } from "../chat/chat-service.js";
@@ -47,6 +49,7 @@ export function App({ service, showPet }: AppProps) {
   const [contextTokens, setContextTokens] = useState(0);
   const [contextMax, setContextMax] = useState(200_000);
   const [phases, setPhases] = useState<TaskPhase[]>([]);
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
 
   // 权限确认状态
   const [permissionPrompt, setPermissionPrompt] = useState<HumanPrompt | null>(null);
@@ -55,6 +58,11 @@ export function App({ service, showPet }: AppProps) {
 
   // 工具结果展开/折叠状态
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
+  const messageQueueRef = useRef(new MessageQueue());
+
+  const syncQueuedMessages = useCallback(() => {
+    setQueuedMessages(messageQueueRef.current.snapshot());
+  }, []);
 
   // 人在回路回调：设置状态 + 返回 Promise
   const humanInTheLoop = useCallback((prompt: HumanPrompt): Promise<HumanChoice> => {
@@ -104,7 +112,7 @@ export function App({ service, showPet }: AppProps) {
   }, [permMode]);
 
   // AI 对话提交（不经命令分流，供 prompt 型命令和普通对话使用）
-  const handleAISubmit = useCallback(async (text: string) => {
+  const runAIMessage = useCallback(async (text: string) => {
     if (!text.trim()) return;
 
     setError(null);
@@ -188,6 +196,22 @@ export function App({ service, showPet }: AppProps) {
     }
   }, [service]);
 
+  const drainQueuedMessages = useCallback(async () => {
+    await messageQueueRef.current.drain(async (text) => {
+      syncQueuedMessages();
+      await runAIMessage(text);
+      syncQueuedMessages();
+    });
+    syncQueuedMessages();
+  }, [runAIMessage, syncQueuedMessages]);
+
+  const enqueueAIMessage = useCallback((text: string) => {
+    if (!text.trim()) return;
+    messageQueueRef.current.enqueue(text);
+    syncQueuedMessages();
+    void drainQueuedMessages();
+  }, [drainQueuedMessages, syncQueuedMessages]);
+
   // UIContext 实例 — 桥接命令系统与 App state / ChatService
   const uiContext: UIContext = useMemo(() => ({
     showMessage(text: string, type: "info" | "warning" | "error"): void {
@@ -201,8 +225,7 @@ export function App({ service, showPet }: AppProps) {
     },
 
     sendUserMessage(text: string): void {
-      // 直接走 AI 路径，绕过命令分流器
-      handleAISubmit(text);
+      enqueueAIMessage(text);
     },
 
     async createTeam(teamName: string, leadName: string): Promise<{ name: string; lead: string }> {
@@ -257,7 +280,7 @@ export function App({ service, showPet }: AppProps) {
     getCwd() {
       return process.cwd();
     },
-  }), [service, handleAISubmit, mode, usage]);
+  }), [service, enqueueAIMessage, mode, usage]);
 
   // MCP 初始化（仅首次挂载时执行）
   useEffect(() => {
@@ -326,6 +349,10 @@ export function App({ service, showPet }: AppProps) {
 
     // 命令分流
     if (text.startsWith("/")) {
+      if (isStreaming || messageQueueRef.current.size > 0) {
+        uiContext.showMessage("当前正在回答，命令暂不支持排队，请稍后再试。", "warning");
+        return;
+      }
       const parsed = parseCommand(text);
 
       if (parsed.isCommand) {
@@ -344,8 +371,14 @@ export function App({ service, showPet }: AppProps) {
     }
 
     // 非命令 → AI 对话
-    await handleAISubmit(text);
-  }, [registry, uiContext, handleAISubmit]);
+    enqueueAIMessage(text);
+  }, [registry, uiContext, enqueueAIMessage, isStreaming]);
+
+  const replyStatusLabel = getReplyStatusLabel(
+    isStreaming,
+    streamingContent,
+    streamingThinking,
+  );
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -362,6 +395,7 @@ export function App({ service, showPet }: AppProps) {
       <ChatView
         messages={messages}
         streamingContent={streamingContent}
+        streamingStatusLabel={replyStatusLabel}
         toolStatus={toolStatus}
         expandedTools={expandedTools}
       />
@@ -401,9 +435,10 @@ export function App({ service, showPet }: AppProps) {
 
       <InputBox
         onSubmit={handleSubmit}
-        disabled={isStreaming || !!permissionPrompt}
+        disabled={!!permissionPrompt}
         error={error ?? undefined}
         registry={registry}
+        queuedMessages={queuedMessages}
         onToggleThinking={() => setThinkingCollapsed((prev) => !prev)}
         onToggleTools={() =>
           setExpandedTools((prev) => {
@@ -424,7 +459,7 @@ export function App({ service, showPet }: AppProps) {
       <InfoBar
         model={service.currentModel}
         usage={usage ?? undefined}
-        streaming={isStreaming}
+        replyStatusLabel={replyStatusLabel}
         messageCount={service.history.length}
         currentRound={currentRound}
         maxRounds={service.maxRounds}

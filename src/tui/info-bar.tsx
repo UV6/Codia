@@ -3,7 +3,7 @@ import { Text, Box } from "ink";
 interface InfoBarProps {
   model: string;
   usage?: { inputTokens: number; outputTokens: number };
-  streaming: boolean;
+  replyStatusLabel?: string | null;
   messageCount: number;
   currentRound: number;
   maxRounds: number;
@@ -40,7 +40,7 @@ function getStatusConfig(permMode: string): StatusConfig {
 export function InfoBar({
   model,
   usage,
-  streaming,
+  replyStatusLabel,
   messageCount,
   currentRound,
   maxRounds,
@@ -78,8 +78,8 @@ export function InfoBar({
         <Text>  </Text>
         <Text dimColor>🔄 {currentRound}/{maxRounds}</Text>
         <Text>  </Text>
-        {streaming && (
-          <Text color="green">⚡ 输出中...</Text>
+        {replyStatusLabel && (
+          <Text color="green">⚡ {replyStatusLabel}</Text>
         )}
       </Box>
 

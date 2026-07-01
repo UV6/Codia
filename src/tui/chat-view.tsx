@@ -6,6 +6,7 @@ import { MarkdownRenderer } from "./markdown-renderer.js";
 interface ChatViewProps {
   messages: Message[];
   streamingContent?: string;
+  streamingStatusLabel?: string | null;
   toolStatus?: string | null;
   expandedTools?: Set<string>;
 }
@@ -122,6 +123,7 @@ export function summarizeDenyReason(content: string): string {
 export function ChatView({
   messages,
   streamingContent,
+  streamingStatusLabel,
   toolStatus,
   expandedTools,
 }: ChatViewProps) {
@@ -205,6 +207,12 @@ export function ChatView({
       {toolStatus && (
         <Box marginTop={messages.length > 0 ? 1 : 0}>
           <Text color="green">{toolStatus}</Text>
+        </Box>
+      )}
+
+      {streamingStatusLabel && (
+        <Box marginTop={messages.length > 0 || toolStatus ? 1 : 0}>
+          <Text color="blue">{streamingStatusLabel}</Text>
         </Box>
       )}
 

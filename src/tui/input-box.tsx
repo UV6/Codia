@@ -3,6 +3,7 @@ import { Text, Box, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { CommandRegistry } from "../command/registry.js";
 import type { CommandDef } from "../command/types.js";
+import { buildQueuedMessagePreviewLines } from "./queued-message-preview.js";
 
 interface InputBoxProps {
   onSubmit: (text: string) => void;
@@ -11,10 +12,11 @@ interface InputBoxProps {
   registry?: CommandRegistry;
   onToggleThinking?: () => void;
   onToggleTools?: () => void;
+  queuedMessages?: string[];
 }
 
 // InputBox —— 用户输入区域，类似 Claude Code 的 "Codia >" 前缀
-export function InputBox({ onSubmit, disabled, error, registry, onToggleThinking, onToggleTools }: InputBoxProps) {
+export function InputBox({ onSubmit, disabled, error, registry, onToggleThinking, onToggleTools, queuedMessages = [] }: InputBoxProps) {
   const [value, setValue] = useState("");
   const [completions, setCompletions] = useState<string[]>([]);
   const [showGrouped, setShowGrouped] = useState(false);
@@ -111,9 +113,20 @@ export function InputBox({ onSubmit, disabled, error, registry, onToggleThinking
     }
   });
 
+  const queuedPreviewLines = buildQueuedMessagePreviewLines(queuedMessages);
+
   return (
     <Box borderStyle="round" borderColor="cyan" flexDirection="column" paddingX={1} width="100%" marginBottom={0}>
       {error && <Text color="red">✗ {error}</Text>}
+      {queuedPreviewLines.length > 0 && (
+        <Box marginBottom={0} flexDirection="column">
+          {queuedPreviewLines.map((line, i) => (
+            <Text key={i} color={i === 0 ? "yellow" : "grey"} dimColor={i !== 0}>
+              {line}
+            </Text>
+          ))}
+        </Box>
+      )}
       {completions.length > 0 && (
         <Box marginBottom={0} flexDirection="column">
           {completions.map((line, i) => (
