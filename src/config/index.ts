@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
 import type { ChatConfig } from "../provider/types.js";
@@ -93,6 +93,10 @@ export function loadConfig(path: string = DEFAULT_CONFIG_PATH): ChatConfig {
     baseUrl: (parsed.base_url as string).replace(/\/+$/, ""), // 去掉末尾斜杠
     apiKey: parsed.api_key as string,
   };
+}
+
+export function configExists(path: string = DEFAULT_CONFIG_PATH): boolean {
+  return existsSync(path);
 }
 
 // loadAppConfig —— 加载包含 agent_loop 的完整配置

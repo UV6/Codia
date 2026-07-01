@@ -9,35 +9,35 @@ const DEFAULT_OPTIONS: InstructionResolveOptions = {
   maxIncludeDepth: 5,
   projectRoot: "/tmp/test-project",
   allowExternalUserFile: false,
-  visited: new Set(),
+  visited: new Set<string>(),
   includeToken: "@include",
 };
 
 describe("isPathAllowed", () => {
   it("允许项目根目录内的路径", () => {
-    const opts = { ...DEFAULT_OPTIONS, visited: new Set() };
+    const opts = { ...DEFAULT_OPTIONS, visited: new Set<string>() };
     expect(isPathAllowed(resolve("/tmp/test-project/src/foo.md"), opts)).toBe(true);
   });
 
   it("允许项目根目录本身", () => {
-    const opts = { ...DEFAULT_OPTIONS, visited: new Set() };
+    const opts = { ...DEFAULT_OPTIONS, visited: new Set<string>() };
     expect(isPathAllowed(resolve("/tmp/test-project"), opts)).toBe(true);
   });
 
   it("拦截项目目录之外的路径", () => {
-    const opts = { ...DEFAULT_OPTIONS, visited: new Set() };
+    const opts = { ...DEFAULT_OPTIONS, visited: new Set<string>() };
     expect(isPathAllowed(resolve("/tmp/other-project/file.md"), opts)).toBe(false);
   });
 
   it("allowExternalUserFile 为 true 时允许用户 .codia 路径", () => {
-    const opts = { ...DEFAULT_OPTIONS, allowExternalUserFile: true, visited: new Set() };
+    const opts = { ...DEFAULT_OPTIONS, allowExternalUserFile: true, visited: new Set<string>() };
     const homeDir = resolve(process.env.HOME || "/", ".codia");
     expect(isPathAllowed(resolve(homeDir, "test.md"), opts)).toBe(true);
   });
 
   it("allowExternalUserFile 为 false 时不检查用户 .codia", () => {
     const homeDir = resolve(process.env.HOME || "/", ".codia");
-    const opts = { ...DEFAULT_OPTIONS, allowExternalUserFile: false, visited: new Set() };
+    const opts = { ...DEFAULT_OPTIONS, allowExternalUserFile: false, visited: new Set<string>() };
     // 用户目录不在项目根下，应被拦截
     if (!homeDir.startsWith("/tmp/test-project")) {
       expect(isPathAllowed(resolve(homeDir, "test.md"), opts)).toBe(false);
@@ -71,7 +71,7 @@ describe("resolveEntry", () => {
     const opts: InstructionResolveOptions = {
       ...DEFAULT_OPTIONS,
       projectRoot: testDir,
-      visited: new Set(),
+      visited: new Set<string>(),
     };
 
     const docs = resolveEntry(join(testDir, "TEST.md"), opts);
@@ -91,7 +91,7 @@ describe("resolveEntry", () => {
       ...DEFAULT_OPTIONS,
       maxIncludeDepth: 2,
       projectRoot: testDir,
-      visited: new Set(),
+      visited: new Set<string>(),
     };
 
     const docs = resolveEntry(join(testDir, "A.md"), opts);
@@ -111,7 +111,7 @@ describe("resolveEntry", () => {
       ...DEFAULT_OPTIONS,
       maxIncludeDepth: 1,
       projectRoot: testDir,
-      visited: new Set(),
+      visited: new Set<string>(),
     };
 
     const docs = resolveEntry(join(testDir, "C.md"), opts);
@@ -138,7 +138,7 @@ describe("resolveEntry", () => {
       ...DEFAULT_OPTIONS,
       maxIncludeDepth: 2,
       projectRoot: testDir,
-      visited: new Set(),
+      visited: new Set<string>(),
     };
 
     const docs = resolveEntry(insideFile, opts);
@@ -157,7 +157,7 @@ describe("resolveEntry", () => {
     const opts: InstructionResolveOptions = {
       ...DEFAULT_OPTIONS,
       projectRoot: testDir,
-      visited: new Set(),
+      visited: new Set<string>(),
     };
     const docs = resolveEntry(join(testDir, "NONEXISTENT.md"), opts);
     expect(docs.some((d) => d.warnings.some((w) => w.includes("不存在")))).toBe(true);

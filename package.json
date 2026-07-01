@@ -4,21 +4,40 @@
   "description": "终端 AI 编程助手（类似 Claude Code）",
   "type": "module",
   "bin": {
-    "codia": "./bin/codia.tsx"
+    "codia": "./dist/bin/codia.js"
   },
   "scripts": {
     "dev": "tsx bin/codia.tsx",
+    "build": "node ./scripts/build-package.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm typecheck && pnpm test && pnpm build",
+    "pack:dry-run": "pnpm pack --dry-run"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "ai",
     "cli",
     "coding-assistant"
   ],
-  "author": "",
+  "author": "liuwei",
+  "homepage": "https://github.com/UV6/Codia",
+  "bugs": {
+    "url": "https://github.com/UV6/Codia/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UV6/Codia.git"
+  },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "packageManager": "pnpm@10.33.0",
   "dependencies": {
     "highlight.js": "^11.11.1",

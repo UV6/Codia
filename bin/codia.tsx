@@ -1,10 +1,11 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 
 import { parseArgs } from "node:util";
 import { existsSync } from "node:fs";
 
 import { render } from "ink";
-import { loadAppConfig, ConfigError } from "../src/config/index.js";
+import { loadAppConfig, ConfigError, DEFAULT_CONFIG_PATH } from "../src/config/index.js";
+import { createCliSetupPrompter, runConfigSetup } from "../src/config/setup.js";
 import { ChatService } from "../src/chat/chat-service.js";
 import { listSessions, sessionPath } from "../src/chat/history.js";
 import { App } from "../src/tui/app.js";
@@ -78,12 +79,34 @@ async function main() {
   try {
     appConfig = loadAppConfig();
   } catch (e) {
-    if (e instanceof ConfigError) {
+    if (
+      e instanceof ConfigError &&
+      e.code === "not_found" &&
+      process.stdin.isTTY &&
+      process.stdout.isTTY
+    ) {
+      const prompter = createCliSetupPrompter();
+      try {
+        const result = await runConfigSetup(DEFAULT_CONFIG_PATH, prompter);
+        console.log("");
+        console.log(`配置已写入：${result.path}`);
+        console.log(`已选择：${result.preset.label}`);
+        console.log("");
+        appConfig = loadAppConfig();
+      } catch (setupError) {
+        console.error("初始化失败：", (setupError as Error).message);
+        process.exit(1);
+      } finally {
+        prompter.close();
+      }
+    } else if (e instanceof ConfigError) {
       console.error(`配置错误 [${e.code}]：${e.message}`);
     } else {
       console.error("启动失败：", (e as Error).message);
     }
-    process.exit(1);
+    if (!appConfig) {
+      process.exit(1);
+    }
   }
 
   // 确定会话文件

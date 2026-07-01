@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { CoordinatorFilter } from "../../team/coordinator-filter.js";
 import type { Tool, ToolContext, ToolResult, ToolInputSchema } from "../../tool/types.js";
+import type { AppConfig } from "../../config/index.js";
 
 // 创建模拟工具的辅助函数
 function makeTool(name: string, readOnly = false): Tool {
@@ -18,6 +19,23 @@ function makeTool(name: string, readOnly = false): Tool {
   };
 }
 
+function makeConfig(enabled: boolean): AppConfig {
+  return {
+    protocol: "openai",
+    model: "test-model",
+    baseUrl: "https://example.com",
+    apiKey: "test-key",
+    agentLoop: { maxRounds: 20 },
+    memory: {},
+    ui: {
+      pet: {
+        enabled: false,
+      },
+    },
+    coordinator: { enabled },
+  };
+}
+
 describe("CoordinatorFilter", () => {
   const originalEnv = process.env.CODIA_COORDINATOR;
 
@@ -32,25 +50,25 @@ describe("CoordinatorFilter", () => {
   describe("isEnabled", () => {
     it("两把锁都开时返回 true", () => {
       process.env.CODIA_COORDINATOR = "1";
-      const config = { coordinator: { enabled: true }, agentLoop: { maxRounds: 20 } };
+      const config = makeConfig(true);
       expect(CoordinatorFilter.isEnabled(config)).toBe(true);
     });
 
     it("配置关、环境变量开 → false", () => {
       process.env.CODIA_COORDINATOR = "1";
-      const config = { coordinator: { enabled: false }, agentLoop: { maxRounds: 20 } };
+      const config = makeConfig(false);
       expect(CoordinatorFilter.isEnabled(config)).toBe(false);
     });
 
     it("配置开、环境变量关 → false", () => {
       delete process.env.CODIA_COORDINATOR;
-      const config = { coordinator: { enabled: true }, agentLoop: { maxRounds: 20 } };
+      const config = makeConfig(true);
       expect(CoordinatorFilter.isEnabled(config)).toBe(false);
     });
 
     it("两把锁都关 → false", () => {
       delete process.env.CODIA_COORDINATOR;
-      const config = { coordinator: { enabled: false }, agentLoop: { maxRounds: 20 } };
+      const config = makeConfig(false);
       expect(CoordinatorFilter.isEnabled(config)).toBe(false);
     });
 
@@ -63,7 +81,7 @@ describe("CoordinatorFilter", () => {
   describe("apply", () => {
     it("开启后 write_file/edit_file 不在结果中", () => {
       process.env.CODIA_COORDINATOR = "1";
-      const config = { coordinator: { enabled: true }, agentLoop: { maxRounds: 20 } };
+      const config = makeConfig(true);
       const tools = [makeTool("read_file", true), makeTool("write_file"), makeTool("edit_file"), makeTool("run_command")];
       const filtered = CoordinatorFilter.apply(tools, config);
       const names = filtered.map((t) => t.name);
@@ -75,7 +93,7 @@ describe("CoordinatorFilter", () => {
 
     it("开启后 Agent 在结果中", () => {
       process.env.CODIA_COORDINATOR = "1";
-      const config = { coordinator: { enabled: true }, agentLoop: { maxRounds: 20 } };
+      const config = makeConfig(true);
       const tools = [makeTool("Agent"), makeTool("write_file")];
       const filtered = CoordinatorFilter.apply(tools, config);
       expect(filtered.map((t) => t.name)).toContain("Agent");
@@ -83,7 +101,7 @@ describe("CoordinatorFilter", () => {
 
     it("关闭后所有工具原样返回", () => {
       delete process.env.CODIA_COORDINATOR;
-      const config = { coordinator: { enabled: true }, agentLoop: { maxRounds: 20 } };
+      const config = makeConfig(true);
       const tools = [makeTool("write_file"), makeTool("read_file")];
       const filtered = CoordinatorFilter.apply(tools, config);
       expect(filtered.length).toBe(2);
@@ -91,7 +109,7 @@ describe("CoordinatorFilter", () => {
 
     it("MCP 工具默认放行", () => {
       process.env.CODIA_COORDINATOR = "1";
-      const config = { coordinator: { enabled: true }, agentLoop: { maxRounds: 20 } };
+      const config = makeConfig(true);
       const tools = [makeTool("mcp__playwright__browser_navigate"), makeTool("write_file")];
       const filtered = CoordinatorFilter.apply(tools, config);
       expect(filtered.map((t) => t.name)).toContain("mcp__playwright__browser_navigate");
