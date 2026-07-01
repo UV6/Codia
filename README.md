@@ -25,7 +25,7 @@
 ### 从 npm 安装
 
 ```bash
-npm install -g codia
+npm install -g codia-cli
 ```
 
 ### 从本地打包产物安装
@@ -105,21 +105,6 @@ protocol: openai
 model: deepseek-v4-flash
 base_url: https://api.deepseek.com
 api_key: YOUR_DEEPSEEK_API_KEY
-```
-
-### 可选配置段
-
-```yaml
-agent_loop:
-  max_rounds: 20
-
-memory:
-  enabled: true
-  model: gpt-5.4
-
-ui:
-  pet:
-    enabled: false
 ```
 
 ## 常用命令
@@ -298,25 +283,6 @@ pnpm pack --dry-run
 
 - 项目级 `.codia/config.yml` 只用于 MCP
 - 主模型配置仍然必须放在 `~/.codia/Codia.yml`
-
-### 4. `--sessions` 看不到旧会话
-
-当前会话路径已经统一到：
-
-```bash
-~/.codia/projects/<project-id>/sessions/
-```
-
-如果你的旧数据还在历史目录，先确认是否已迁移。
-
-### 5. 旧版本使用的是 `~/.Codia`
-
-可以手动迁移：
-
-```bash
-mkdir -p ~/.codia
-cp -R ~/.Codia/* ~/.codia/
-```
 
 ## 许可
 

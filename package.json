@@ -1,8 +1,11 @@
 {
-  "name": "codia",
+  "name": "codia-cli",
   "version": "0.1.0",
-  "description": "终端 AI 编程助手（类似 Claude Code）",
+  "description": "终端 AI 编程助手",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "codia": "./dist/bin/codia.js"
   },
