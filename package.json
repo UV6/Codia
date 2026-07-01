@@ -17,6 +17,7 @@
   },
   "files": [
     "dist",
+    "INSTALL.md",
     "README.md",
     "LICENSE"
   ],
